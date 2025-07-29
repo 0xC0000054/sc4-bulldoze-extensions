@@ -29,6 +29,14 @@
 
 namespace
 {
+	struct S3DColorFloat
+	{
+		float r;
+		float g;
+		float b;
+		float a;
+	};
+
 	struct cSC4ViewInputControlDemolish : public cISC4ViewInputControl
 	{
 		uint8_t bInitialized;
@@ -57,7 +65,10 @@ namespace
 		uint8_t unknown3[28];
 		void* pMarkedCellView;
 		uint8_t bSignPostOccupant;
-		uint8_t unknown4[64];
+		S3DColorFloat destroyOK;
+		S3DColorFloat destroyNotOK;
+		S3DColorFloat demolishOK;
+		S3DColorFloat demolishNotOK;
 	};
 
 	static_assert(sizeof(cSC4ViewInputControlDemolish) == 0xd8);
