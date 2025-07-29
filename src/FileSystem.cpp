@@ -17,8 +17,8 @@
 
 using namespace std::string_view_literals;
 
-static constexpr std::string_view PluginConfigFileName = "SC4QueryUIHooks.ini"sv;
-static constexpr std::string_view PluginLogFileName = "SC4QueryUIHooks.log"sv;
+static constexpr std::string_view PluginConfigFileName = "SC4BulldozeExtensions.ini"sv;
+static constexpr std::string_view PluginLogFileName = "SC4BulldozeExtensions.log"sv;
 
 namespace
 {
