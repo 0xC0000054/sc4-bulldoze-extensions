@@ -11,6 +11,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "cSC4ViewInputControlDemolishHooks.h"
+#include "wil/result.h"
 #include "cIGZAllocatorService.h"
 #include "cISC4Demolition.h"
 #include "cISC4OccupantFilter.h"
@@ -24,8 +25,9 @@
 #include "SC4List.h"
 #include "SC4VersionDetection.h"
 #include <Windows.h>
-#include "wil/result.h"
 #include <cstdint>
+#include <algorithm>
+#include <cstdlib>
 
 namespace
 {
@@ -80,6 +82,81 @@ namespace
 	};
 
 	static OccupantFilterType occupantFilterType = OccupantFilterType::None;
+	static bool diagonalMode = false;
+
+	// Helper function to create a diagonal region from two points
+	SC4CellRegion<int32_t> CreateDiagonalRegion(int32_t x1, int32_t z1, int32_t x2, int32_t z2)
+	{
+		Logger& logger = Logger::GetInstance();
+		
+		// Log the input rectangle coordinates
+		logger.WriteLineFormatted(LogLevel::Debug, 
+			"Creating diagonal region from rectangle: (%d,%d) to (%d,%d)", 
+			x1, z1, x2, z2);
+
+		// Calculate bounding box for the region
+		int32_t minX = (std::min)(x1, x2);
+		int32_t maxX = (std::max)(x1, x2);
+		int32_t minZ = (std::min)(z1, z2);
+		int32_t maxZ = (std::max)(z1, z2);
+
+		// Create region with all cells initially false
+		SC4CellRegion<int32_t> region(minX, minZ, maxX, maxZ, false);
+
+		// Use Bresenham's line algorithm to mark diagonal cells
+		int32_t dx = abs(x2 - x1);
+		int32_t dz = abs(z2 - z1);
+		int32_t sx = x1 < x2 ? 1 : -1;
+		int32_t sz = z1 < z2 ? 1 : -1;
+		int32_t err = dx - dz;
+
+		logger.WriteLineFormatted(LogLevel::Debug, 
+			"Bresenham parameters: dx=%d, dz=%d, sx=%d, sz=%d, initial_err=%d", 
+			dx, dz, sx, sz, err);
+
+		int32_t currentX = x1;
+		int32_t currentZ = z1;
+		int32_t tileCount = 0;
+
+		while (true)
+		{
+			// Set the current cell to true in the region
+			int32_t cellX = currentX - minX;
+			int32_t cellZ = currentZ - minZ;
+			if (cellX >= 0 && cellX < (maxX - minX + 1) && cellZ >= 0 && cellZ < (maxZ - minZ + 1))
+			{
+				region.cellMap.SetValue(cellX, cellZ, true);
+				tileCount++;
+				
+				// Trace level logging for each tile (optional, very verbose)
+				if (logger.IsEnabled(LogLevel::Trace))
+				{
+					logger.WriteLineFormatted(LogLevel::Trace, 
+						"Marking tile: (%d,%d)", currentX, currentZ);
+				}
+			}
+
+			if (currentX == x2 && currentZ == z2) break;
+
+			int32_t e2 = 2 * err;
+			if (e2 > -dz)
+			{
+				err -= dz;
+				currentX += sx;
+			}
+			if (e2 < dx)
+			{
+				err += dx;
+				currentZ += sz;
+			}
+		}
+
+		logger.WriteLineFormatted(LogLevel::Debug, 
+			"Diagonal line created: %d tiles from (%d,%d) to (%d,%d)", 
+			tileCount, x1, z1, x2, z2);
+
+		return region;
+	}
 
 	typedef bool(__thiscall* cSC4ViewInputControl_IsOnTop)(cISC4ViewInputControl* pThis);
 
@@ -90,12 +167,32 @@ namespace
 	static const cSC4ViewInputControlDemolish_ThiscallFn EndInput = reinterpret_cast<cSC4ViewInputControlDemolish_ThiscallFn>(0x4b9040);
 	static const cSC4ViewInputControlDemolish_ThiscallFn UpdateSelectedRegion = reinterpret_cast<cSC4ViewInputControlDemolish_ThiscallFn>(0x4b93b0);
 
-	void SetOccupantFilterOption(cSC4ViewInputControlDemolish* pThis, OccupantFilterType type)
+	void SetOccupantFilterOption(cSC4ViewInputControlDemolish* pThis, OccupantFilterType type, bool diagonal)
 	{
-		if (occupantFilterType != type)
+		if (occupantFilterType != type || diagonalMode != diagonal)
 		{
 			occupantFilterType = type;
+			diagonalMode = diagonal;
 
+			// Log mode change
+			Logger& logger = Logger::GetInstance();
+			const char* filterTypeName = "Normal";
+			switch (occupantFilterType)
+			{
+			case OccupantFilterType::Flora:
+				filterTypeName = "Flora";
+				break;
+			case OccupantFilterType::Network:
+				filterTypeName = "Network";
+				break;
+			}
+			
+			logger.WriteLineFormatted(LogLevel::Info, 
+				"Bulldoze mode changed: %s%s", 
+				diagonalMode ? "Diagonal " : "", 
+				filterTypeName);
+
+			// Set cursor based on occupant filter type (diagonal mode uses same cursors)
 			switch (occupantFilterType)
 			{
 			case OccupantFilterType::Flora:
@@ -146,25 +243,33 @@ namespace
 			}
 			else
 			{
-				// Because we currently only have 2 additional bulldoze modes we
-				// configure them using the B key with modifiers.
-				// This also avoids any issues with overriding other tool shortcuts.
+				// Configure bulldoze modes using the B key with modifiers.
+				// Alt acts as a diagonal modifier on top of the base modes.
 				if (vkCode == 'B')
 				{
 					handled = true;
 					const uint32_t activeModifiers = modifiers & ModifierKeyFlagAll;
+					const bool isDiagonal = (activeModifiers & ModifierKeyFlagAlt) == ModifierKeyFlagAlt;
 
 					if (activeModifiers == ModifierKeyFlagNone)
 					{
-						SetOccupantFilterOption(pThis, OccupantFilterType::None);
+						// B - Normal bulldoze
+						SetOccupantFilterOption(pThis, OccupantFilterType::None, false);
+					}
+					else if (activeModifiers == ModifierKeyFlagAlt)
+					{
+						// Alt+B - Diagonal normal bulldoze
+						SetOccupantFilterOption(pThis, OccupantFilterType::None, true);
 					}
 					else if ((activeModifiers & ModifierKeyFlagControl) == ModifierKeyFlagControl)
 					{
-						SetOccupantFilterOption(pThis, OccupantFilterType::Flora);
+						// Ctrl+B or Alt+Ctrl+B - Flora bulldoze (with or without diagonal)
+						SetOccupantFilterOption(pThis, OccupantFilterType::Flora, isDiagonal);
 					}
 					else if ((activeModifiers & ModifierKeyFlagShift) == ModifierKeyFlagShift)
 					{
-						SetOccupantFilterOption(pThis, OccupantFilterType::Network);
+						// Shift+B or Alt+Shift+B - Network bulldoze (with or without diagonal)
+						SetOccupantFilterOption(pThis, OccupantFilterType::Network, isDiagonal);
 					}
 				}
 			}
@@ -176,6 +281,7 @@ namespace
 	void __fastcall Activate(cSC4ViewInputControlDemolish* pThis, void* edxUnused)
 	{
 		occupantFilterType = OccupantFilterType::None;
+		diagonalMode = false;
 
 		switch (pThis->cursorIID)
 		{
@@ -244,6 +350,42 @@ namespace
 		long demolishEffectX,
 		long demolishEffectZ)
 	{
+		Logger& logger = Logger::GetInstance();
+		
+		// Apply diagonal modification if enabled
+		if (diagonalMode)
+		{
+			const auto& bounds = cellRegion.bounds;
+			logger.WriteLineFormatted(LogLevel::Info, 
+				"Diagonal bulldoze preview: original region (%d,%d) to (%d,%d)", 
+				bounds.topLeftX, bounds.topLeftY, bounds.bottomRightX, bounds.bottomRightY);
+			
+			SC4CellRegion<int32_t> diagonalRegion = CreateDiagonalRegion(
+				bounds.topLeftX, bounds.topLeftY,
+				bounds.bottomRightX, bounds.bottomRightY
+			);
+			
+			return DemolishRegion(
+				pDemolition,
+				false, // demolish
+				diagonalRegion,
+				1, // privilegeType
+				flags,
+				clearZonedArea,
+				totalCost,
+				demolishedOccupantSet,
+				pDemolishEffectOccupant,
+				demolishEffectX,
+				demolishEffectZ);
+		}
+
+		// Normal rectangular bulldoze preview
+		const auto& bounds = cellRegion.bounds;
+		int32_t tileCount = (bounds.bottomRightX - bounds.topLeftX + 1) * (bounds.bottomRightY - bounds.topLeftY + 1);
+		logger.WriteLineFormatted(LogLevel::Debug, 
+			"Normal bulldoze preview: %d tiles in region (%d,%d) to (%d,%d)", 
+			tileCount, bounds.topLeftX, bounds.topLeftY, bounds.bottomRightX, bounds.bottomRightY);
+
 		return DemolishRegion(
 			pDemolition,
 			false, // demolish
@@ -272,6 +414,47 @@ namespace
 		long demolishEffectX,
 		long demolishEffectZ)
 	{
+		Logger& logger = Logger::GetInstance();
+		
+		// Apply diagonal modification if enabled
+		if (diagonalMode)
+		{
+			const auto& bounds = cellRegion.bounds;
+			logger.WriteLineFormatted(LogLevel::Info, 
+				"EXECUTING diagonal bulldoze: original region (%d,%d) to (%d,%d)", 
+				bounds.topLeftX, bounds.topLeftY, bounds.bottomRightX, bounds.bottomRightY);
+			
+			SC4CellRegion<int32_t> diagonalRegion = CreateDiagonalRegion(
+				bounds.topLeftX, bounds.topLeftY,
+				bounds.bottomRightX, bounds.bottomRightY
+			);
+			
+			bool result = DemolishRegion(
+				pDemolition,
+				true, // demolish
+				diagonalRegion,
+				1, // privilegeType
+				flags,
+				clearZonedArea,
+				totalCost,
+				demolishedOccupantSet,
+				pDemolishEffectOccupant,
+				demolishEffectX,
+				demolishEffectZ);
+			
+			logger.WriteLineFormatted(LogLevel::Info, 
+				"Diagonal bulldoze completed: success=%s", result ? "true" : "false");
+			
+			return result;
+		}
+
+		// Normal rectangular bulldoze execution
+		const auto& bounds = cellRegion.bounds;
+		int32_t tileCount = (bounds.bottomRightX - bounds.topLeftX + 1) * (bounds.bottomRightY - bounds.topLeftY + 1);
+		logger.WriteLineFormatted(LogLevel::Debug, 
+			"EXECUTING normal bulldoze: %d tiles in region (%d,%d) to (%d,%d)", 
+			tileCount, bounds.topLeftX, bounds.topLeftY, bounds.bottomRightX, bounds.bottomRightY);
+
 		return DemolishRegion(
 			pDemolition,
 			true, // demolish

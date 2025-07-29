@@ -2,5 +2,6 @@
   "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
   "dependencies": [
     "wil"
-  ]
+  ],
+  "builtin-baseline": "e140b1fde236eb682b0d47f905e65008a191800f"
 }

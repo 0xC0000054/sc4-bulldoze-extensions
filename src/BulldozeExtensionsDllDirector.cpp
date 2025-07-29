@@ -50,7 +50,7 @@ public:
 		: pView3D(nullptr)
 	{
 		Logger& logger = Logger::GetInstance();
-		logger.Init(FileSystem::GetLogFilePath(), LogLevel::Info);
+		logger.Init(FileSystem::GetLogFilePath(), LogLevel::Debug);
 		logger.WriteLogFileHeader("SC4BulldozeExtensions v" PLUGIN_VERSION_STR);
 	}
 
