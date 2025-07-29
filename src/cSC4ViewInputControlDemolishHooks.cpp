@@ -57,9 +57,12 @@ namespace
 		uint8_t bValidDemolitionTarget;
 		void* pSelectedOccupant;							// cISC4Occupant*
 		uint8_t unknown3[28];
-		void* pMarkedCellView;
-		uint8_t bSignPostOccupant;
-		uint8_t unknown4[64];
+		void* pMarkedCellView;                    // 0x90
+		uint32_t bSignPostOccupant;              // 0x94 (4 bytes instead of 1)
+		float colorArray1[4];                    // 0x98-0xA7 (RGBA)
+		float colorArray2[4];                    // 0xA8-0xB7 (RGBA) 
+		float colorArray3[4];                    // 0xB8-0xC7 (RGBA) - Main preview color
+		float colorArray4[4];                    // 0xC8-0xD7 (RGBA)
 	};
 
 	static_assert(sizeof(cSC4ViewInputControlDemolish) == 0xd8);
@@ -513,16 +516,13 @@ namespace
 		// Try to modify preview colors using our global view control pointer
 		if (currentViewControl)
 		{
-			// Therefore: [0]=Alpha, [1]=Red, [2]=Green, [3]=Blue (ARGB format)
-			float floraColor[4] = { 1.0f, 0.0f, 0.8f, 0.0f };    // Green for flora (A=1, R=0, G=0.8, B=0)
-			float networkColor[4] = { 1.0f, 0.0f, 0.0f, 1.0f };  // Blue for network (A=1, R=0, G=0, B=1)
+			// Intuitive color scheme with alpha blending:
+			// RGBA format: [0]=Red, [1]=Green, [2]=Blue, [3]=Alpha
+			float floraColor[4] = { 0.38f, 0.69f, 0.38f, 0.5f };   // Green for flora/nature
+			float networkColor[4] = { 0.98f, 0.60f, 0.20f, 0.5f }; // Orange for networks/infrastructure
 			
-			// Try to find and modify color arrays at various offsets
-			// Based on Mac binary: colors are at offsets 0xa4, 0xb4, 0xc4, 0xd4 relative to structure start
-			uint8_t* pStruct = reinterpret_cast<uint8_t*>(currentViewControl);
-			
-			// Define default red color for normal bulldoze
-			float normalColor[4] = { 1.0f, 0.8f, 0.0f, 0.0f };     // Red for normal (A=1, R=0.8, G=0, B=0)
+			// Define blue color for standard bulldoze (classic demolish color)
+			float normalColor[4] = { 0.30f, 0.60f, 0.85f, 0.5f };   // Blue for standard
 			
 			float* colorToUse = nullptr;
 			const char* modeName = "Normal";
@@ -546,35 +546,26 @@ namespace
 			
 			if (colorToUse != nullptr)
 			{
-				// From testing, it seems the preview color array is at offset 0xB4 and in ARGB format
-				int previewColorOffset = 0xB4;
-				float* colorArray = reinterpret_cast<float*>(pStruct + previewColorOffset);
+				// Direct access to colorArray3 (main preview color array)
+				float* previewColor = currentViewControl->colorArray3;
 				
-				// Validate color array (all values should be between 0.0 and 1.0)
-				if (colorArray[0] >= 0.0f && colorArray[0] <= 1.0f &&
-					colorArray[1] >= 0.0f && colorArray[1] <= 1.0f &&
-					colorArray[2] >= 0.0f && colorArray[2] <= 1.0f &&
-					colorArray[3] >= 0.0f && colorArray[3] <= 1.0f)
-				{
-					// Debug logging: show before and after colors
-					logger.WriteLineFormatted(LogLevel::Debug, 
-						"Preview color BEFORE %s: A=%.3f, R=%.3f, G=%.3f, B=%.3f", 
-						modeName, colorArray[0], colorArray[1], colorArray[2], colorArray[3]);
-					
-					// Set preview color (ARGB format: Alpha, Red, Green, Blue)
-					colorArray[0] = colorToUse[0]; // Alpha
-					colorArray[1] = colorToUse[1]; // Red
-					colorArray[2] = colorToUse[2]; // Green
-					colorArray[3] = colorToUse[3]; // Blue
-					
-					logger.WriteLineFormatted(LogLevel::Debug, 
-						"Preview color AFTER %s: A=%.3f, R=%.3f, G=%.3f, B=%.3f", 
-						modeName, colorArray[0], colorArray[1], colorArray[2], colorArray[3]);
-				}
+				// Debug logging: show before and after colors
+				logger.WriteLineFormatted(LogLevel::Debug, 
+					"Preview color BEFORE %s: R=%.3f, G=%.3f, B=%.3f, A=%.3f", 
+					modeName, previewColor[0], previewColor[1], previewColor[2], previewColor[3]);
+				
+				// Set preview color (RGBA format: Red, Green, Blue, Alpha)
+				previewColor[0] = colorToUse[0]; // Red
+				previewColor[1] = colorToUse[1]; // Green
+				previewColor[2] = colorToUse[2]; // Blue
+				previewColor[3] = colorToUse[3]; // Alpha
+				
+				logger.WriteLineFormatted(LogLevel::Debug, 
+					"Preview color AFTER %s: R=%.3f, G=%.3f, B=%.3f, A=%.3f", 
+					modeName, previewColor[0], previewColor[1], previewColor[2], previewColor[3]);
 			}
 		}
 		
-
 		// Apply diagonal modification if enabled and we have valid view control
 		if (diagonalMode && currentViewControl && currentViewControl->pCellRegion)
 		{
@@ -589,7 +580,7 @@ namespace
 				pViewControl->cellPointX, pViewControl->cellPointZ
 			);
 			
-			// We view control's cellMap contents without changing structure, to avoid memory issues later
+			// Update view control's cellMap contents without changing structure
 			auto& existingCellMap = pViewControl->pCellRegion->cellMap;
 			const auto& diagonalCellMap = diagonalRegion.cellMap;
 			
@@ -671,7 +662,7 @@ namespace
 		{
 			const auto& bounds = cellRegion.bounds;
 			
-			// Pass the actual drag start point from the view control. This is useful to determine the direction of the diagonal bulldoze tool.
+			// Pass the actual drag start point from the view control
 			SC4CellRegion<int32_t> diagonalRegion = CreateDiagonalRegion(
 				bounds.topLeftX, bounds.topLeftY,
 				bounds.bottomRightX, bounds.bottomRightY,
@@ -694,6 +685,7 @@ namespace
 		}
 
 		// Normal rectangular bulldoze execution
+
 		return DemolishRegion(
 			pDemolition,
 			true, // demolish
