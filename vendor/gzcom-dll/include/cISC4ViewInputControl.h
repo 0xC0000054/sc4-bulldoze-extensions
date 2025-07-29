@@ -31,7 +31,15 @@ public:
 	virtual bool OnMouseUpL(int32_t unknown1, uint32_t unknown2) = 0;
 	virtual bool OnMouseUpR(int32_t unknown1, uint32_t unknown2) = 0;
 	virtual bool OnMouseMove(int32_t x, int32_t z, uint32_t modifiers) = 0;
-	virtual bool OnMouseWheel(int32_t unknown1, int32_t unknown2, uint32_t unknown3, int32_t unknown4) = 0;
+	/// <summary>
+	/// Called when the mouse wheel is scrolled over the view
+	/// </summary>
+	/// <param name="x">Mouse X coordinate in view space</param>
+	/// <param name="z">Mouse Z coordinate in view space</param>
+	/// <param name="modifiers">Modifier key flags (Shift=0x1, Ctrl=0x2, Alt=0x4)</param>
+	/// <param name="wheelDelta">Wheel scroll delta (positive=up/away, negative=down/toward)</param>
+	/// <returns>true if the event was handled, false to allow default processing</returns>
+	virtual bool OnMouseWheel(int32_t x, int32_t z, uint32_t modifiers, int32_t wheelDelta) = 0;
 	virtual bool OnMouseExit() = 0;
 
 	virtual void Activate() = 0;

@@ -83,17 +83,14 @@ namespace
 
 	static OccupantFilterType occupantFilterType = OccupantFilterType::None;
 	static bool diagonalMode = false;
+	static int32_t diagonalThickness = 1; // Default thickness is 1 (single line)
 	static cSC4ViewInputControlDemolish* currentViewControl = nullptr;
 
-	// Helper function to create a diagonal region from two points with drag direction detection
+
+	// Helper function to create a diagonal region from two points with drag direction detection and thickness
 	SC4CellRegion<int32_t> CreateDiagonalRegion(int32_t x1, int32_t z1, int32_t x2, int32_t z2, int32_t startX = -1, int32_t startZ = -1)
 	{
 		Logger& logger = Logger::GetInstance();
-		
-		// Log the input rectangle coordinates
-		logger.WriteLineFormatted(LogLevel::Debug, 
-			"Creating diagonal region from rectangle: (%d,%d) to (%d,%d)", 
-			x1, z1, x2, z2);
 
 		// Calculate bounding box for the region
 		int32_t minX = (std::min)(x1, x2);
@@ -109,47 +106,36 @@ namespace
 		
 		if (startX != -1 && startZ != -1)
 		{
-			// We have the actual drag start point - use it to determine direction
-			logger.WriteLineFormatted(LogLevel::Info, 
-				"DRAG DEBUG: Actual start point (%d,%d), rectangle (%d,%d) to (%d,%d)", 
-				startX, startZ, x1, z1, x2, z2);
-			
 			// Determine which corner the user started from
 			if (startX == minX && startZ == minZ)
 			{
 				// Started from top-left -> draw to bottom-right
 				diagStartX = minX; diagStartZ = minZ;
 				diagEndX = maxX; diagEndZ = maxZ;
-				logger.WriteLineFormatted(LogLevel::Info, "DRAG: Top-left to bottom-right");
 			}
 			else if (startX == maxX && startZ == minZ)
 			{
 				// Started from top-right -> draw to bottom-left  
 				diagStartX = maxX; diagStartZ = minZ;
 				diagEndX = minX; diagEndZ = maxZ;
-				logger.WriteLineFormatted(LogLevel::Info, "DRAG: Top-right to bottom-left");
 			}
 			else if (startX == minX && startZ == maxZ)
 			{
 				// Started from bottom-left -> draw to top-right
 				diagStartX = minX; diagStartZ = maxZ;
 				diagEndX = maxX; diagEndZ = minZ;
-				logger.WriteLineFormatted(LogLevel::Info, "DRAG: Bottom-left to top-right");
 			}
 			else if (startX == maxX && startZ == maxZ)
 			{
 				// Started from bottom-right -> draw to top-left
 				diagStartX = maxX; diagStartZ = maxZ;
 				diagEndX = minX; diagEndZ = minZ;
-				logger.WriteLineFormatted(LogLevel::Info, "DRAG: Bottom-right to top-left");
 			}
 			else
 			{
 				// Start point doesn't match corners exactly - use default NW-SE
 				diagStartX = minX; diagStartZ = minZ;
 				diagEndX = maxX; diagEndZ = maxZ;
-				logger.WriteLineFormatted(LogLevel::Error, 
-					"DRAG: Start point (%d,%d) doesn't match corners, using default", startX, startZ);
 			}
 		}
 		else
@@ -157,7 +143,6 @@ namespace
 			// No start point provided - use default NW-to-SE diagonal
 			diagStartX = minX; diagStartZ = minZ;
 			diagEndX = maxX; diagEndZ = maxZ;
-			logger.WriteLineFormatted(LogLevel::Debug, "Using default NW-to-SE diagonal");
 		}
 
 		// Use Bresenham's line algorithm to mark diagonal cells
@@ -167,9 +152,6 @@ namespace
 		int32_t sz = diagStartZ < diagEndZ ? 1 : -1;
 		int32_t err = dx - dz;
 
-		logger.WriteLineFormatted(LogLevel::Debug, 
-			"Bresenham parameters: dx=%d, dz=%d, sx=%d, sz=%d, initial_err=%d", 
-			dx, dz, sx, sz, err);
 
 		int32_t currentX = diagStartX;
 		int32_t currentZ = diagStartZ;
@@ -177,19 +159,37 @@ namespace
 
 		while (true)
 		{
-			// Set the current cell to true in the region
-			int32_t cellX = currentX - minX;
-			int32_t cellZ = currentZ - minZ;
-			if (cellX >= 0 && cellX < (maxX - minX + 1) && cellZ >= 0 && cellZ < (maxZ - minZ + 1))
+			// Set the current cell and perpendicular cells for thickness
+			// Handle positive/negative thickness values (skip 0)
+			int32_t startOffset, endOffset;
+			if (diagonalThickness > 0) {
+				startOffset = 0;
+				endOffset = diagonalThickness - 1;
+			} else {
+				startOffset = diagonalThickness + 1;
+				endOffset = 0;
+			}
+			
+			for (int32_t thickOffset = startOffset; thickOffset <= endOffset; thickOffset++)
 			{
-				region.cellMap.SetValue(cellX, cellZ, true);
-				tileCount++;
+				// Calculate perpendicular offset based on line direction
+				int32_t perpX, perpZ;
+				if (abs(dx) > abs(dz)) {
+					// More horizontal line - add thickness vertically
+					perpX = currentX;
+					perpZ = currentZ + thickOffset;
+				} else {
+					// More vertical line - add thickness horizontally  
+					perpX = currentX + thickOffset;
+					perpZ = currentZ;
+				}
 				
-				// Trace level logging for each tile (optional, very verbose)
-				if (logger.IsEnabled(LogLevel::Trace))
+				int32_t cellX = perpX - minX;
+				int32_t cellZ = perpZ - minZ;
+				if (cellX >= 0 && cellX < (maxX - minX + 1) && cellZ >= 0 && cellZ < (maxZ - minZ + 1))
 				{
-					logger.WriteLineFormatted(LogLevel::Trace, 
-						"Marking tile: (%d,%d)", currentX, currentZ);
+					region.cellMap.SetValue(cellX, cellZ, true);
+					tileCount++;
 				}
 			}
 
@@ -209,8 +209,7 @@ namespace
 		}
 
 		logger.WriteLineFormatted(LogLevel::Debug, 
-			"Diagonal line created: %d tiles from (%d,%d) to (%d,%d)", 
-			tileCount, diagStartX, diagStartZ, diagEndX, diagEndZ);
+			"Created diagonal line: %d tiles, thickness=%d", tileCount, diagonalThickness);
 
 		return region;
 	}
@@ -234,24 +233,6 @@ namespace
 		{
 			occupantFilterType = type;
 			diagonalMode = diagonal;
-
-			// Log mode change
-			Logger& logger = Logger::GetInstance();
-			const char* filterTypeName = "Normal";
-			switch (occupantFilterType)
-			{
-			case OccupantFilterType::Flora:
-				filterTypeName = "Flora";
-				break;
-			case OccupantFilterType::Network:
-				filterTypeName = "Network";
-				break;
-			}
-			
-			logger.WriteLineFormatted(LogLevel::Info, 
-				"Bulldoze mode changed: %s%s", 
-				diagonalMode ? "Diagonal " : "", 
-				filterTypeName);
 
 			// Set cursor based on occupant filter type and diagonal mode
 			switch (occupantFilterType)
@@ -279,14 +260,8 @@ namespace
 				// REVERSE ENGINEERING SOLUTION: Safely modify existing pCellRegion contents
 				if (diagonal && pThis->pCellRegion)
 				{
-					Logger& logger = Logger::GetInstance();
-					
 					// Get current rectangular bounds
 					const auto& bounds = pThis->pCellRegion->bounds;
-					
-					logger.WriteLineFormatted(LogLevel::Debug,
-						"Updating pCellRegion cellMap for diagonal preview: (%d,%d) to (%d,%d)",
-						bounds.topLeftX, bounds.topLeftY, bounds.bottomRightX, bounds.bottomRightY);
 					
 					// Create diagonal region to get the cell pattern
 					// Pass the actual drag start point from the view control
@@ -323,14 +298,6 @@ namespace
 								existingCellMap.SetValue(x, z, diagonalValue);
 							}
 						}
-						
-						logger.WriteLineFormatted(LogLevel::Debug,
-							"Successfully updated cellMap with diagonal pattern (%dx%d)", width, height);
-					}
-					else
-					{
-						logger.WriteLineFormatted(LogLevel::Error,
-							"CellMap bounds mismatch - skipping diagonal update");
 					}
 				}
 				
@@ -347,6 +314,59 @@ namespace
 		ModifierKeyFlagAlt = 0x4,
 		ModifierKeyFlagAll = ModifierKeyFlagShift | ModifierKeyFlagControl | ModifierKeyFlagAlt,
 	};
+
+	bool __fastcall OnMouseWheelHook(
+		cSC4ViewInputControlDemolish* pThis,
+		void* edxUnused,
+		int32_t x,
+		int32_t z,
+		uint32_t modifiers,
+		int32_t wheelDelta)
+	{
+		Logger& logger = Logger::GetInstance();
+		
+		// Check if we're in diagonal mode and Alt is held
+		if (diagonalMode && (modifiers & ModifierKeyFlagAlt))
+		{
+			// Adjust diagonal thickness based on wheel direction
+			int32_t oldThickness = diagonalThickness;
+			
+			if (wheelDelta > 0)
+			{
+				// Scroll up - increase thickness (max 5, skip 0)
+				if (diagonalThickness == -1) diagonalThickness = 1;
+				else diagonalThickness = (std::min)(diagonalThickness + 1, 5);
+			}
+			else if (wheelDelta < 0)
+			{
+				// Scroll down - decrease thickness (min -5, skip 0)
+				if (diagonalThickness == 1) diagonalThickness = -1;
+				else diagonalThickness = (std::max)(diagonalThickness - 1, -5);
+			}
+			
+			if (diagonalThickness != oldThickness)
+			{
+				logger.WriteLineFormatted(LogLevel::Debug,
+					"Diagonal thickness: %d -> %d", oldThickness, diagonalThickness);
+				
+				// Update preview if we have an active selection
+				if (pThis->bCellPicked && pThis->pCellRegion)
+				{
+					// Trigger preview update by calling SetOccupantFilterOption
+					SetOccupantFilterOption(pThis, occupantFilterType, diagonalMode);
+					
+					// Force immediate visual update of the preview
+					UpdateSelectedRegion(pThis);
+				}
+			}
+			
+			// Return true to indicate we handled the event (prevents zooming)
+			return true;
+		}
+		
+		// Let default behavior handle normal zoom
+		return false;
+	}
 
 	bool __fastcall OnKeyDownHook(
 		cSC4ViewInputControlDemolish* pThis,
@@ -407,6 +427,7 @@ namespace
 	{
 		occupantFilterType = OccupantFilterType::None;
 		diagonalMode = false;
+		diagonalThickness = 1; // Reset thickness to default
 		currentViewControl = pThis;
 
 		switch (pThis->cursorIID)
@@ -489,17 +510,76 @@ namespace
 	{
 		Logger& logger = Logger::GetInstance();
 		
-		// REVERSE ENGINEERING SOLUTION: Use the globally stored view control pointer
-		// This is much more reliable than stack walking or register inspection
+		// Try to modify preview colors using our global view control pointer
+		if (currentViewControl)
+		{
+			// Therefore: [0]=Alpha, [1]=Red, [2]=Green, [3]=Blue (ARGB format)
+			float floraColor[4] = { 1.0f, 0.0f, 0.8f, 0.0f };    // Green for flora (A=1, R=0, G=0.8, B=0)
+			float networkColor[4] = { 1.0f, 0.0f, 0.0f, 1.0f };  // Blue for network (A=1, R=0, G=0, B=1)
+			
+			// Try to find and modify color arrays at various offsets
+			// Based on Mac binary: colors are at offsets 0xa4, 0xb4, 0xc4, 0xd4 relative to structure start
+			uint8_t* pStruct = reinterpret_cast<uint8_t*>(currentViewControl);
+			
+			// Define default red color for normal bulldoze
+			float normalColor[4] = { 1.0f, 0.8f, 0.0f, 0.0f };     // Red for normal (A=1, R=0.8, G=0, B=0)
+			
+			float* colorToUse = nullptr;
+			const char* modeName = "Normal";
+			
+			switch (occupantFilterType)
+			{
+			case OccupantFilterType::Flora:
+				colorToUse = floraColor;
+				modeName = "Flora";
+				break;
+			case OccupantFilterType::Network:
+				colorToUse = networkColor;
+				modeName = "Network";
+				break;
+			case OccupantFilterType::None:
+			default:
+				colorToUse = normalColor;
+				modeName = "Normal";
+				break;
+			}
+			
+			if (colorToUse != nullptr)
+			{
+				// From testing, it seems the preview color array is at offset 0xB4 and in ARGB format
+				int previewColorOffset = 0xB4;
+				float* colorArray = reinterpret_cast<float*>(pStruct + previewColorOffset);
+				
+				// Validate color array (all values should be between 0.0 and 1.0)
+				if (colorArray[0] >= 0.0f && colorArray[0] <= 1.0f &&
+					colorArray[1] >= 0.0f && colorArray[1] <= 1.0f &&
+					colorArray[2] >= 0.0f && colorArray[2] <= 1.0f &&
+					colorArray[3] >= 0.0f && colorArray[3] <= 1.0f)
+				{
+					// Debug logging: show before and after colors
+					logger.WriteLineFormatted(LogLevel::Debug, 
+						"Preview color BEFORE %s: A=%.3f, R=%.3f, G=%.3f, B=%.3f", 
+						modeName, colorArray[0], colorArray[1], colorArray[2], colorArray[3]);
+					
+					// Set preview color (ARGB format: Alpha, Red, Green, Blue)
+					colorArray[0] = colorToUse[0]; // Alpha
+					colorArray[1] = colorToUse[1]; // Red
+					colorArray[2] = colorToUse[2]; // Green
+					colorArray[3] = colorToUse[3]; // Blue
+					
+					logger.WriteLineFormatted(LogLevel::Debug, 
+						"Preview color AFTER %s: A=%.3f, R=%.3f, G=%.3f, B=%.3f", 
+						modeName, colorArray[0], colorArray[1], colorArray[2], colorArray[3]);
+				}
+			}
+		}
 		
+
 		// Apply diagonal modification if enabled and we have valid view control
 		if (diagonalMode && currentViewControl && currentViewControl->pCellRegion)
 		{
 			cSC4ViewInputControlDemolish* pViewControl = currentViewControl;
 			const auto& bounds = cellRegion.bounds;
-			logger.WriteLineFormatted(LogLevel::Info, 
-				"Diagonal bulldoze preview: original region (%d,%d) to (%d,%d)", 
-				bounds.topLeftX, bounds.topLeftY, bounds.bottomRightX, bounds.bottomRightY);
 			
 			// Create diagonal region
 			// Pass the actual drag start point from the view control
@@ -509,7 +589,7 @@ namespace
 				pViewControl->cellPointX, pViewControl->cellPointZ
 			);
 			
-			// SAFE APPROACH: Update view control's cellMap contents without changing structure
+			// We view control's cellMap contents without changing structure, to avoid memory issues later
 			auto& existingCellMap = pViewControl->pCellRegion->cellMap;
 			const auto& diagonalCellMap = diagonalRegion.cellMap;
 			
@@ -535,9 +615,6 @@ namespace
 						existingCellMap.SetValue(x, z, diagonalValue);
 					}
 				}
-				
-				logger.WriteLineFormatted(LogLevel::Debug, 
-					"Updated view control cellMap with diagonal pattern for preview (%dx%d)", width, height);
 			}
 			
 			// Call demolish with diagonal region for preview calculation
@@ -558,11 +635,6 @@ namespace
 		}
 
 		// Normal rectangular bulldoze preview
-		const auto& bounds = cellRegion.bounds;
-		int32_t tileCount = (bounds.bottomRightX - bounds.topLeftX + 1) * (bounds.bottomRightY - bounds.topLeftY + 1);
-		logger.WriteLineFormatted(LogLevel::Debug, 
-			"Normal bulldoze preview: %d tiles in region (%d,%d) to (%d,%d)", 
-			tileCount, bounds.topLeftX, bounds.topLeftY, bounds.bottomRightX, bounds.bottomRightY);
 
 		return DemolishRegion(
 			pDemolition,
@@ -598,11 +670,8 @@ namespace
 		if (diagonalMode)
 		{
 			const auto& bounds = cellRegion.bounds;
-			logger.WriteLineFormatted(LogLevel::Info, 
-				"EXECUTING diagonal bulldoze: original region (%d,%d) to (%d,%d)", 
-				bounds.topLeftX, bounds.topLeftY, bounds.bottomRightX, bounds.bottomRightY);
 			
-			// Pass the actual drag start point from the view control
+			// Pass the actual drag start point from the view control. This is useful to determine the direction of the diagonal bulldoze tool.
 			SC4CellRegion<int32_t> diagonalRegion = CreateDiagonalRegion(
 				bounds.topLeftX, bounds.topLeftY,
 				bounds.bottomRightX, bounds.bottomRightY,
@@ -610,7 +679,7 @@ namespace
 				currentViewControl ? currentViewControl->cellPointZ : -1
 			);
 			
-			bool result = DemolishRegion(
+			return DemolishRegion(
 				pDemolition,
 				true, // demolish
 				diagonalRegion,
@@ -622,20 +691,9 @@ namespace
 				pDemolishEffectOccupant,
 				demolishEffectX,
 				demolishEffectZ);
-			
-			logger.WriteLineFormatted(LogLevel::Info, 
-				"Diagonal bulldoze completed: success=%s", result ? "true" : "false");
-			
-			return result;
 		}
 
 		// Normal rectangular bulldoze execution
-		const auto& bounds = cellRegion.bounds;
-		int32_t tileCount = (bounds.bottomRightX - bounds.topLeftX + 1) * (bounds.bottomRightY - bounds.topLeftY + 1);
-		logger.WriteLineFormatted(LogLevel::Debug, 
-			"EXECUTING normal bulldoze: %d tiles in region (%d,%d) to (%d,%d)", 
-			tileCount, bounds.topLeftX, bounds.topLeftY, bounds.bottomRightX, bounds.bottomRightY);
-
 		return DemolishRegion(
 			pDemolition,
 			true, // demolish
@@ -710,11 +768,12 @@ bool cSC4ViewInputControlDemolishHooks::Install()
 		try
 		{
 			Patcher::InstallJumpTableHook(0xa901d8, reinterpret_cast<uintptr_t>(&OnKeyDownHook));
+			Patcher::InstallJumpTableHook(0xa901f4, reinterpret_cast<uintptr_t>(&OnMouseWheelHook));
 			Patcher::InstallJumpTableHook(0xa901fc, reinterpret_cast<uintptr_t>(&Activate));
 			InstallUpdateSelectedRegionDemolishRegionHook();
 			InstallOnMouseUpLDemolishRegionHook();
 
-			logger.WriteLine(LogLevel::Info, "Installed the bulldozer extensions.");
+			logger.WriteLine(LogLevel::Info, "Installed the bulldozer extensions (with preview colors).");
 			installed = true;
 		}
 		catch (const wil::ResultException& e)
