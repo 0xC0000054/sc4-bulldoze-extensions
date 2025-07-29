@@ -83,6 +83,7 @@ namespace
 
 	static OccupantFilterType occupantFilterType = OccupantFilterType::None;
 	static bool diagonalMode = false;
+	static cSC4ViewInputControlDemolish* currentViewControl = nullptr;
 
 	// Helper function to create a diagonal region from two points
 	SC4CellRegion<int32_t> CreateDiagonalRegion(int32_t x1, int32_t z1, int32_t x2, int32_t z2)
@@ -167,8 +168,12 @@ namespace
 	static const cSC4ViewInputControlDemolish_ThiscallFn EndInput = reinterpret_cast<cSC4ViewInputControlDemolish_ThiscallFn>(0x4b9040);
 	static const cSC4ViewInputControlDemolish_ThiscallFn UpdateSelectedRegion = reinterpret_cast<cSC4ViewInputControlDemolish_ThiscallFn>(0x4b93b0);
 
+
 	void SetOccupantFilterOption(cSC4ViewInputControlDemolish* pThis, OccupantFilterType type, bool diagonal)
 	{
+		// Always store the current view control for use in other hooks
+		currentViewControl = pThis;
+		
 		if (occupantFilterType != type || diagonalMode != diagonal)
 		{
 			occupantFilterType = type;
@@ -192,23 +197,85 @@ namespace
 				diagonalMode ? "Diagonal " : "", 
 				filterTypeName);
 
-			// Set cursor based on occupant filter type (diagonal mode uses same cursors)
+			// Set cursor based on occupant filter type and diagonal mode
 			switch (occupantFilterType)
 			{
 			case OccupantFilterType::Flora:
-				pThis->SetCursor(cSC4ViewInputControlDemolishHooks::BulldozeCursorFlora);
+				pThis->SetCursor(diagonalMode ? 
+					cSC4ViewInputControlDemolishHooks::BulldozeCursorFloraDiagonal : 
+					cSC4ViewInputControlDemolishHooks::BulldozeCursorFlora);
 				break;
 			case OccupantFilterType::Network:
-				pThis->SetCursor(cSC4ViewInputControlDemolishHooks::BulldozeCursorNetwork);
+				pThis->SetCursor(diagonalMode ? 
+					cSC4ViewInputControlDemolishHooks::BulldozeCursorNetworkDiagonal : 
+					cSC4ViewInputControlDemolishHooks::BulldozeCursorNetwork);
 				break;
 			case OccupantFilterType::None:
 			default:
-				pThis->SetCursor(cSC4ViewInputControlDemolishHooks::BulldozeCursorDefault);
+				pThis->SetCursor(diagonalMode ? 
+					cSC4ViewInputControlDemolishHooks::BulldozeCursorDefaultDiagonal : 
+					cSC4ViewInputControlDemolishHooks::BulldozeCursorDefault);
 				break;
 			}
 
 			if (pThis->bCellPicked)
 			{
+				// REVERSE ENGINEERING SOLUTION: Safely modify existing pCellRegion contents
+				if (diagonal && pThis->pCellRegion)
+				{
+					Logger& logger = Logger::GetInstance();
+					
+					// Get current rectangular bounds
+					const auto& bounds = pThis->pCellRegion->bounds;
+					
+					logger.WriteLineFormatted(LogLevel::Debug,
+						"Updating pCellRegion cellMap for diagonal preview: (%d,%d) to (%d,%d)",
+						bounds.topLeftX, bounds.topLeftY, bounds.bottomRightX, bounds.bottomRightY);
+					
+					// Create diagonal region to get the cell pattern
+					SC4CellRegion<int32_t> diagonalRegion = CreateDiagonalRegion(
+						bounds.topLeftX, bounds.topLeftY,
+						bounds.bottomRightX, bounds.bottomRightY
+					);
+					
+					// SAFE APPROACH: Only modify the cellMap contents, not the structure
+					// Copy diagonal pattern into existing cellMap without changing pointers
+					auto& existingCellMap = pThis->pCellRegion->cellMap;
+					const auto& diagonalCellMap = diagonalRegion.cellMap;
+					
+					// Calculate dimensions from bounds (both regions should have same bounds)
+					const auto& existingBounds = pThis->pCellRegion->bounds;
+					const auto& diagonalBounds = diagonalRegion.bounds;
+					
+					uint32_t width = static_cast<uint32_t>(bounds.bottomRightX - bounds.topLeftX + 1);
+					uint32_t height = static_cast<uint32_t>(bounds.bottomRightY - bounds.topLeftY + 1);
+					
+					// Verify bounds match before copying
+					if (existingBounds.topLeftX == diagonalBounds.topLeftX &&
+						existingBounds.topLeftY == diagonalBounds.topLeftY &&
+						existingBounds.bottomRightX == diagonalBounds.bottomRightX &&
+						existingBounds.bottomRightY == diagonalBounds.bottomRightY)
+					{
+						// Copy cell values from diagonal pattern to existing map
+						for (uint32_t x = 0; x < width; x++)
+						{
+							for (uint32_t z = 0; z < height; z++)
+							{
+								bool diagonalValue = diagonalCellMap.GetValue(x, z);
+								existingCellMap.SetValue(x, z, diagonalValue);
+							}
+						}
+						
+						logger.WriteLineFormatted(LogLevel::Debug,
+							"Successfully updated cellMap with diagonal pattern (%dx%d)", width, height);
+					}
+					else
+					{
+						logger.WriteLineFormatted(LogLevel::Error,
+							"CellMap bounds mismatch - skipping diagonal update");
+					}
+				}
+				
 				UpdateSelectedRegion(pThis);
 			}
 		}
@@ -282,14 +349,26 @@ namespace
 	{
 		occupantFilterType = OccupantFilterType::None;
 		diagonalMode = false;
+		currentViewControl = pThis;
 
 		switch (pThis->cursorIID)
 		{
 		case cSC4ViewInputControlDemolishHooks::BulldozeCursorFlora:
 			occupantFilterType = OccupantFilterType::Flora;
 			break;
+		case cSC4ViewInputControlDemolishHooks::BulldozeCursorFloraDiagonal:
+			occupantFilterType = OccupantFilterType::Flora;
+			diagonalMode = true;
+			break;
 		case cSC4ViewInputControlDemolishHooks::BulldozeCursorNetwork:
 			occupantFilterType = OccupantFilterType::Network;
+			break;
+		case cSC4ViewInputControlDemolishHooks::BulldozeCursorNetworkDiagonal:
+			occupantFilterType = OccupantFilterType::Network;
+			diagonalMode = true;
+			break;
+		case cSC4ViewInputControlDemolishHooks::BulldozeCursorDefaultDiagonal:
+			diagonalMode = true;
 			break;
 		}
 	}
@@ -352,20 +431,57 @@ namespace
 	{
 		Logger& logger = Logger::GetInstance();
 		
-		// Apply diagonal modification if enabled
-		if (diagonalMode)
+		// REVERSE ENGINEERING SOLUTION: Use the globally stored view control pointer
+		// This is much more reliable than stack walking or register inspection
+		
+		// Apply diagonal modification if enabled and we have valid view control
+		if (diagonalMode && currentViewControl && currentViewControl->pCellRegion)
 		{
+			cSC4ViewInputControlDemolish* pViewControl = currentViewControl;
 			const auto& bounds = cellRegion.bounds;
 			logger.WriteLineFormatted(LogLevel::Info, 
 				"Diagonal bulldoze preview: original region (%d,%d) to (%d,%d)", 
 				bounds.topLeftX, bounds.topLeftY, bounds.bottomRightX, bounds.bottomRightY);
 			
+			// Create diagonal region
 			SC4CellRegion<int32_t> diagonalRegion = CreateDiagonalRegion(
 				bounds.topLeftX, bounds.topLeftY,
 				bounds.bottomRightX, bounds.bottomRightY
 			);
 			
-			return DemolishRegion(
+			// SAFE APPROACH: Update view control's cellMap contents without changing structure
+			auto& existingCellMap = pViewControl->pCellRegion->cellMap;
+			const auto& diagonalCellMap = diagonalRegion.cellMap;
+			
+			// Calculate dimensions from bounds
+			const auto& existingBounds = pViewControl->pCellRegion->bounds;
+			const auto& diagonalBounds = diagonalRegion.bounds;
+			
+			uint32_t width = static_cast<uint32_t>(bounds.bottomRightX - bounds.topLeftX + 1);
+			uint32_t height = static_cast<uint32_t>(bounds.bottomRightY - bounds.topLeftY + 1);
+			
+			// Verify bounds match and update cellMap safely
+			if (existingBounds.topLeftX == diagonalBounds.topLeftX &&
+				existingBounds.topLeftY == diagonalBounds.topLeftY &&
+				existingBounds.bottomRightX == diagonalBounds.bottomRightX &&
+				existingBounds.bottomRightY == diagonalBounds.bottomRightY)
+			{
+				// Copy diagonal pattern into existing cellMap
+				for (uint32_t x = 0; x < width; x++)
+				{
+					for (uint32_t z = 0; z < height; z++)
+					{
+						bool diagonalValue = diagonalCellMap.GetValue(x, z);
+						existingCellMap.SetValue(x, z, diagonalValue);
+					}
+				}
+				
+				logger.WriteLineFormatted(LogLevel::Debug, 
+					"Updated view control cellMap with diagonal pattern for preview (%dx%d)", width, height);
+			}
+			
+			// Call demolish with diagonal region for preview calculation
+			bool result = DemolishRegion(
 				pDemolition,
 				false, // demolish
 				diagonalRegion,
@@ -377,6 +493,8 @@ namespace
 				pDemolishEffectOccupant,
 				demolishEffectX,
 				demolishEffectZ);
+			
+			return result;
 		}
 
 		// Normal rectangular bulldoze preview
@@ -468,6 +586,7 @@ namespace
 			demolishEffectX,
 			demolishEffectZ);
 	}
+
 
 	void InstallUpdateSelectedRegionDemolishRegionHook()
 	{
