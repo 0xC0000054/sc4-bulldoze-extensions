@@ -85,8 +85,8 @@ namespace
 	static bool diagonalMode = false;
 	static cSC4ViewInputControlDemolish* currentViewControl = nullptr;
 
-	// Helper function to create a diagonal region from two points
-	SC4CellRegion<int32_t> CreateDiagonalRegion(int32_t x1, int32_t z1, int32_t x2, int32_t z2)
+	// Helper function to create a diagonal region from two points with drag direction detection
+	SC4CellRegion<int32_t> CreateDiagonalRegion(int32_t x1, int32_t z1, int32_t x2, int32_t z2, int32_t startX = -1, int32_t startZ = -1)
 	{
 		Logger& logger = Logger::GetInstance();
 		
@@ -104,19 +104,75 @@ namespace
 		// Create region with all cells initially false
 		SC4CellRegion<int32_t> region(minX, minZ, maxX, maxZ, false);
 
+		// Determine the correct diagonal direction based on actual drag start point
+		int32_t diagStartX, diagStartZ, diagEndX, diagEndZ;
+		
+		if (startX != -1 && startZ != -1)
+		{
+			// We have the actual drag start point - use it to determine direction
+			logger.WriteLineFormatted(LogLevel::Info, 
+				"DRAG DEBUG: Actual start point (%d,%d), rectangle (%d,%d) to (%d,%d)", 
+				startX, startZ, x1, z1, x2, z2);
+			
+			// Determine which corner the user started from
+			if (startX == minX && startZ == minZ)
+			{
+				// Started from top-left -> draw to bottom-right
+				diagStartX = minX; diagStartZ = minZ;
+				diagEndX = maxX; diagEndZ = maxZ;
+				logger.WriteLineFormatted(LogLevel::Info, "DRAG: Top-left to bottom-right");
+			}
+			else if (startX == maxX && startZ == minZ)
+			{
+				// Started from top-right -> draw to bottom-left  
+				diagStartX = maxX; diagStartZ = minZ;
+				diagEndX = minX; diagEndZ = maxZ;
+				logger.WriteLineFormatted(LogLevel::Info, "DRAG: Top-right to bottom-left");
+			}
+			else if (startX == minX && startZ == maxZ)
+			{
+				// Started from bottom-left -> draw to top-right
+				diagStartX = minX; diagStartZ = maxZ;
+				diagEndX = maxX; diagEndZ = minZ;
+				logger.WriteLineFormatted(LogLevel::Info, "DRAG: Bottom-left to top-right");
+			}
+			else if (startX == maxX && startZ == maxZ)
+			{
+				// Started from bottom-right -> draw to top-left
+				diagStartX = maxX; diagStartZ = maxZ;
+				diagEndX = minX; diagEndZ = minZ;
+				logger.WriteLineFormatted(LogLevel::Info, "DRAG: Bottom-right to top-left");
+			}
+			else
+			{
+				// Start point doesn't match corners exactly - use default NW-SE
+				diagStartX = minX; diagStartZ = minZ;
+				diagEndX = maxX; diagEndZ = maxZ;
+				logger.WriteLineFormatted(LogLevel::Error, 
+					"DRAG: Start point (%d,%d) doesn't match corners, using default", startX, startZ);
+			}
+		}
+		else
+		{
+			// No start point provided - use default NW-to-SE diagonal
+			diagStartX = minX; diagStartZ = minZ;
+			diagEndX = maxX; diagEndZ = maxZ;
+			logger.WriteLineFormatted(LogLevel::Debug, "Using default NW-to-SE diagonal");
+		}
+
 		// Use Bresenham's line algorithm to mark diagonal cells
-		int32_t dx = abs(x2 - x1);
-		int32_t dz = abs(z2 - z1);
-		int32_t sx = x1 < x2 ? 1 : -1;
-		int32_t sz = z1 < z2 ? 1 : -1;
+		int32_t dx = abs(diagEndX - diagStartX);
+		int32_t dz = abs(diagEndZ - diagStartZ);
+		int32_t sx = diagStartX < diagEndX ? 1 : -1;
+		int32_t sz = diagStartZ < diagEndZ ? 1 : -1;
 		int32_t err = dx - dz;
 
 		logger.WriteLineFormatted(LogLevel::Debug, 
 			"Bresenham parameters: dx=%d, dz=%d, sx=%d, sz=%d, initial_err=%d", 
 			dx, dz, sx, sz, err);
 
-		int32_t currentX = x1;
-		int32_t currentZ = z1;
+		int32_t currentX = diagStartX;
+		int32_t currentZ = diagStartZ;
 		int32_t tileCount = 0;
 
 		while (true)
@@ -137,7 +193,7 @@ namespace
 				}
 			}
 
-			if (currentX == x2 && currentZ == z2) break;
+			if (currentX == diagEndX && currentZ == diagEndZ) break;
 
 			int32_t e2 = 2 * err;
 			if (e2 > -dz)
@@ -154,7 +210,7 @@ namespace
 
 		logger.WriteLineFormatted(LogLevel::Debug, 
 			"Diagonal line created: %d tiles from (%d,%d) to (%d,%d)", 
-			tileCount, x1, z1, x2, z2);
+			tileCount, diagStartX, diagStartZ, diagEndX, diagEndZ);
 
 		return region;
 	}
@@ -233,9 +289,11 @@ namespace
 						bounds.topLeftX, bounds.topLeftY, bounds.bottomRightX, bounds.bottomRightY);
 					
 					// Create diagonal region to get the cell pattern
+					// Pass the actual drag start point from the view control
 					SC4CellRegion<int32_t> diagonalRegion = CreateDiagonalRegion(
 						bounds.topLeftX, bounds.topLeftY,
-						bounds.bottomRightX, bounds.bottomRightY
+						bounds.bottomRightX, bounds.bottomRightY,
+						pThis->cellPointX, pThis->cellPointZ
 					);
 					
 					// SAFE APPROACH: Only modify the cellMap contents, not the structure
@@ -444,9 +502,11 @@ namespace
 				bounds.topLeftX, bounds.topLeftY, bounds.bottomRightX, bounds.bottomRightY);
 			
 			// Create diagonal region
+			// Pass the actual drag start point from the view control
 			SC4CellRegion<int32_t> diagonalRegion = CreateDiagonalRegion(
 				bounds.topLeftX, bounds.topLeftY,
-				bounds.bottomRightX, bounds.bottomRightY
+				bounds.bottomRightX, bounds.bottomRightY,
+				pViewControl->cellPointX, pViewControl->cellPointZ
 			);
 			
 			// SAFE APPROACH: Update view control's cellMap contents without changing structure
@@ -542,9 +602,12 @@ namespace
 				"EXECUTING diagonal bulldoze: original region (%d,%d) to (%d,%d)", 
 				bounds.topLeftX, bounds.topLeftY, bounds.bottomRightX, bounds.bottomRightY);
 			
+			// Pass the actual drag start point from the view control
 			SC4CellRegion<int32_t> diagonalRegion = CreateDiagonalRegion(
 				bounds.topLeftX, bounds.topLeftY,
-				bounds.bottomRightX, bounds.bottomRightY
+				bounds.bottomRightX, bounds.bottomRightY,
+				currentViewControl ? currentViewControl->cellPointX : -1,
+				currentViewControl ? currentViewControl->cellPointZ : -1
 			);
 			
 			bool result = DemolishRegion(
