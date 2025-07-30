@@ -112,6 +112,11 @@ namespace
 	{
 		Logger& logger = Logger::GetInstance();
 
+		// LOG: Diagnostic information about cell points
+		logger.WriteLineFormatted(LogLevel::Debug,
+			"CreateDiagonalRegion: bounds=(%d,%d) to (%d,%d), startPoint=(%d,%d)",
+			x1, z1, x2, z2, startX, startZ);
+
 		// Calculate bounding box for the region
 		int32_t minX = (std::min)(x1, x2);
 		int32_t maxX = (std::max)(x1, x2);
@@ -121,46 +126,205 @@ namespace
 		// Create region with all cells initially false
 		SC4CellRegion<int32_t> region(minX, minZ, maxX, maxZ, false);
 
-		// Determine the correct diagonal direction based on actual drag start point
+		// STABLE ENDPOINT CALCULATION: Use the original drag coordinates (x1,z1) and (x2,z2)
+		// instead of always using bounds corners. This prevents jumping during drag operations.
 		int32_t diagStartX, diagStartZ, diagEndX, diagEndZ;
 		
 		if (startX != -1 && startZ != -1)
 		{
-			// Determine which corner the user started from
+			// Handle start points that might be outside bounds
+			// This can happen when the drag starts on one cell but the final bounds exclude it for some reason. Fixes issues in built-up cities.
+			
+			// First, try exact corner matching
 			if (startX == minX && startZ == minZ)
 			{
 				// Started from top-left -> draw to bottom-right
 				diagStartX = minX; diagStartZ = minZ;
 				diagEndX = maxX; diagEndZ = maxZ;
+				logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Exact match TL->BR");
 			}
 			else if (startX == maxX && startZ == minZ)
 			{
 				// Started from top-right -> draw to bottom-left  
 				diagStartX = maxX; diagStartZ = minZ;
 				diagEndX = minX; diagEndZ = maxZ;
+				logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Exact match TR->BL");
 			}
 			else if (startX == minX && startZ == maxZ)
 			{
 				// Started from bottom-left -> draw to top-right
 				diagStartX = minX; diagStartZ = maxZ;
 				diagEndX = maxX; diagEndZ = minZ;
+				logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Exact match BL->TR");
 			}
 			else if (startX == maxX && startZ == maxZ)
 			{
 				// Started from bottom-right -> draw to top-left
 				diagStartX = maxX; diagStartZ = maxZ;
 				diagEndX = minX; diagEndZ = minZ;
+				logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Exact match BR->TL");
 			}
 			else
 			{
-				// Start point doesn't match corners exactly - use default NW-SE
-				diagStartX = minX; diagStartZ = minZ;
-				diagEndX = maxX; diagEndZ = maxZ;
+				// Start point doesn't match corners exactly
+				// Try to infer direction based on which side of bounds the start point is on
+				logger.WriteLineFormatted(LogLevel::Debug,
+					"CreateDiagonalRegion: Start point (%d,%d) outside bounds (%d,%d) to (%d,%d), inferring direction",
+					startX, startZ, minX, minZ, maxX, maxZ);
+				
+				// Determine which quadrant/edge relative to bounds the start point is in
+				bool startIsLeft = startX < minX;      // Strictly less than (outside left edge)
+				bool startIsTop = startZ < minZ;       // Strictly less than (outside top edge)  
+				bool startIsRight = startX > maxX;     // Strictly greater than (outside right edge)
+				bool startIsBottom = startZ > maxZ;    // Strictly greater than (outside bottom edge)
+				bool startOnLeftEdge = startX == minX;  // Exactly on left edge
+				bool startOnTopEdge = startZ == minZ;   // Exactly on top edge
+				bool startOnRightEdge = startX == maxX; // Exactly on right edge
+				bool startOnBottomEdge = startZ == maxZ; // Exactly on bottom edge
+				
+				if (startIsLeft && startIsTop)
+				{
+					// Start is northwest of bounds -> diagonal TL to BR
+					diagStartX = minX; diagStartZ = minZ;
+					diagEndX = maxX; diagEndZ = maxZ;
+					logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Inferred NW quadrant->SE (TL->BR)");
+				}
+				else if (startIsRight && startIsTop)
+				{
+					// Start is northeast of bounds -> diagonal TR to BL
+					diagStartX = maxX; diagStartZ = minZ;
+					diagEndX = minX; diagEndZ = maxZ;
+					logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Inferred NE quadrant->SW (TR->BL)");
+				}
+				else if (startIsLeft && startIsBottom)
+				{
+					// Start is southwest of bounds -> diagonal BL to TR
+					diagStartX = minX; diagStartZ = maxZ;
+					diagEndX = maxX; diagEndZ = minZ;
+					logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Inferred SW quadrant->NE (BL->TR)");
+				}
+				else if (startIsRight && startIsBottom)
+				{
+					// Start is southeast of bounds -> diagonal BR to TL
+					diagStartX = maxX; diagStartZ = maxZ;
+					diagEndX = minX; diagEndZ = minZ;
+					logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Inferred SE quadrant->NW (BR->TL)");
+				}
+				// Handle edge cases where start point is on an edge or inside bounds
+				else if (startOnLeftEdge || startIsLeft)
+				{
+					// On or near left edge - determine vertical direction
+					if (startZ <= minZ + (maxZ - minZ) / 2)
+					{
+						// Closer to top -> TL to BR
+						diagStartX = minX; diagStartZ = minZ;
+						diagEndX = maxX; diagEndZ = maxZ;
+						logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Left edge, upper half->SE (TL->BR)");
+					}
+					else
+					{
+						// Closer to bottom -> BL to TR
+						diagStartX = minX; diagStartZ = maxZ;
+						diagEndX = maxX; diagEndZ = minZ;
+						logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Left edge, lower half->NE (BL->TR)");
+					}
+				}
+				else if (startOnRightEdge || startIsRight)
+				{
+					// On or near right edge - determine vertical direction
+					if (startZ <= minZ + (maxZ - minZ) / 2)
+					{
+						// Closer to top -> TR to BL
+						diagStartX = maxX; diagStartZ = minZ;
+						diagEndX = minX; diagEndZ = maxZ;
+						logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Right edge, upper half->SW (TR->BL)");
+					}
+					else
+					{
+						// Closer to bottom -> BR to TL
+						diagStartX = maxX; diagStartZ = maxZ;  
+						diagEndX = minX; diagEndZ = minZ;
+						logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Right edge, lower half->NW (BR->TL)");
+					}
+				}
+				else if (startOnTopEdge || startIsTop)
+				{
+					// On or near top edge - determine horizontal direction
+					if (startX <= minX + (maxX - minX) / 2)
+					{
+						// Closer to left -> TL to BR
+						diagStartX = minX; diagStartZ = minZ;
+						diagEndX = maxX; diagEndZ = maxZ;
+						logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Top edge, left half->SE (TL->BR)");
+					}
+					else
+					{
+						// Closer to right -> TR to BL
+						diagStartX = maxX; diagStartZ = minZ;
+						diagEndX = minX; diagEndZ = maxZ;
+						logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Top edge, right half->SW (TR->BL)");
+					}
+				}
+				else if (startOnBottomEdge || startIsBottom)
+				{
+					// On or near bottom edge - determine horizontal direction
+					if (startX <= minX + (maxX - minX) / 2)
+					{
+						// Closer to left -> BL to TR
+						diagStartX = minX; diagStartZ = maxZ;
+						diagEndX = maxX; diagEndZ = minZ;
+						logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Bottom edge, left half->NE (BL->TR)");
+					}
+					else
+					{
+						// Closer to right -> BR to TL
+						diagStartX = maxX; diagStartZ = maxZ;
+						diagEndX = minX; diagEndZ = minZ;
+						logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Bottom edge, right half->NW (BR->TL)");
+					}
+				}
+				else
+				{
+					// Inside bounds or other edge case - use position relative to center
+					int32_t centerX = minX + (maxX - minX) / 2;
+					int32_t centerZ = minZ + (maxZ - minZ) / 2;
+					
+					if (startX <= centerX && startZ <= centerZ)
+					{
+						// Northwest quadrant within bounds -> TL to BR
+						diagStartX = minX; diagStartZ = minZ;
+						diagEndX = maxX; diagEndZ = maxZ;
+						logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Inside bounds, NW->SE (TL->BR)");
+					}
+					else if (startX > centerX && startZ <= centerZ)
+					{
+						// Northeast quadrant within bounds -> TR to BL
+						diagStartX = maxX; diagStartZ = minZ;
+						diagEndX = minX; diagEndZ = maxZ;
+						logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Inside bounds, NE->SW (TR->BL)");
+					}
+					else if (startX <= centerX && startZ > centerZ)
+					{
+						// Southwest quadrant within bounds -> BL to TR
+						diagStartX = minX; diagStartZ = maxZ;
+						diagEndX = maxX; diagEndZ = minZ;
+						logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Inside bounds, SW->NE (BL->TR)");
+					}
+					else
+					{
+						// Southeast quadrant within bounds -> BR to TL
+						diagStartX = maxX; diagStartZ = maxZ;
+						diagEndX = minX; diagEndZ = minZ;
+						logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Inside bounds, SE->NW (BR->TL)");
+					}
+				}
 			}
 		}
 		else
 		{
 			// No start point provided - use default NW-to-SE diagonal
+			logger.WriteLineFormatted(LogLevel::Debug,
+				"CreateDiagonalRegion: No start point provided, defaulting to NW-SE diagonal");
 			diagStartX = minX; diagStartZ = minZ;
 			diagEndX = maxX; diagEndZ = maxZ;
 		}
@@ -277,12 +441,35 @@ namespace
 
 			if (pThis->bCellPicked)
 			{
-				// REVERSE ENGINEERING SOLUTION: Safely modify existing pCellRegion contents
+				// Safely modify existing pCellRegion contents
 				if (diagonal && pThis->pCellRegion)
 				{
 					// Get current rectangular bounds
 					const auto& bounds = pThis->pCellRegion->bounds;
 					
+					// LOG: Diagnostic information about cell points and unknown2 array
+					Logger& logger = Logger::GetInstance();
+					logger.WriteLineFormatted(LogLevel::Debug,
+						"SetOccupantFilterOption: cellPointX=%d, cellPointZ=%d, bCellPicked=%d",
+						pThis->cellPointX, pThis->cellPointZ, pThis->bCellPicked);
+
+					// Log unknown2 array contents when cell points might be invalid
+					if (pThis->cellPointX == -1 || pThis->cellPointZ == -1 || 
+						pThis->cellPointX == 0 || pThis->cellPointZ == 0)
+					{
+						std::string unknown2Hex;
+						for (int i = 0; i < 27; i++)
+						{
+							char hexBuf[4];
+							sprintf_s(hexBuf, "%02X", pThis->unknown2[i]);
+							if (i > 0) unknown2Hex += " ";
+							unknown2Hex += hexBuf;
+						}
+						logger.WriteLineFormatted(LogLevel::Debug,
+							"SetOccupantFilterOption: Cell points invalid, unknown2[27] = %s",
+							unknown2Hex.c_str());
+					}
+
 					// Create diagonal region to get the cell pattern
 					// Pass the actual drag start point from the view control
 					SC4CellRegion<int32_t> diagonalRegion = CreateDiagonalRegion(
@@ -291,7 +478,7 @@ namespace
 						pThis->cellPointX, pThis->cellPointZ
 					);
 					
-					// SAFE APPROACH: Only modify the cellMap contents, not the structure
+					// Only modify the cellMap contents, not the structure
 					// Copy diagonal pattern into existing cellMap without changing pointers
 					auto& existingCellMap = pThis->pCellRegion->cellMap;
 					const auto& diagonalCellMap = diagonalRegion.cellMap;
@@ -567,7 +754,7 @@ namespace
 				S3DColorFloat* previewColor = &(currentViewControl->demolishOK);
 				
 				// Debug logging: show before and after colors
-				logger.WriteLineFormatted(LogLevel::Debug,
+				logger.WriteLineFormatted(LogLevel::Trace,
 					"Preview color BEFORE %s: R=%.3f, G=%.3f, B=%.3f, A=%.3f",
 					modeName, previewColor->r, previewColor->g, previewColor->b, previewColor->a);
 
@@ -577,7 +764,7 @@ namespace
 				previewColor->b = colorToUse[2]; // Blue
 				previewColor->a = colorToUse[3]; // Alpha
 				
-				logger.WriteLineFormatted(LogLevel::Debug, 
+				logger.WriteLineFormatted(LogLevel::Trace, 
 					"Preview color AFTER %s: R=%.3f, G=%.3f, B=%.3f, A=%.3f", 
 					modeName, previewColor->r, previewColor->g, previewColor->b, previewColor->a);
 			}
@@ -588,6 +775,28 @@ namespace
 		{
 			cSC4ViewInputControlDemolish* pViewControl = currentViewControl;
 			const auto& bounds = cellRegion.bounds;
+			
+			// LOG: Diagnostic information for preview function
+			logger.WriteLineFormatted(LogLevel::Debug,
+				"DemolishPreview: cellPointX=%d, cellPointZ=%d, bCellPicked=%d",
+				pViewControl->cellPointX, pViewControl->cellPointZ, pViewControl->bCellPicked);
+			
+			// Log unknown2 array contents when cell points might be invalid
+			if (pViewControl->cellPointX == -1 || pViewControl->cellPointZ == -1 || 
+				pViewControl->cellPointX == 0 || pViewControl->cellPointZ == 0)
+			{
+				std::string unknown2Hex;
+				for (int i = 0; i < 27; i++)
+				{
+					char hexBuf[4];
+					sprintf_s(hexBuf, "%02X", pViewControl->unknown2[i]);
+					if (i > 0) unknown2Hex += " ";
+					unknown2Hex += hexBuf;
+				}
+				logger.WriteLineFormatted(LogLevel::Debug,
+					"DemolishPreview: Cell points invalid, unknown2[27] = %s",
+					unknown2Hex.c_str());
+			}
 			
 			// Create diagonal region
 			// Pass the actual drag start point from the view control
@@ -678,6 +887,36 @@ namespace
 		if (diagonalMode)
 		{
 			const auto& bounds = cellRegion.bounds;
+			
+			// LOG: Diagnostic information for actual demolish function
+			if (currentViewControl)
+			{
+				logger.WriteLineFormatted(LogLevel::Debug,
+					"OnMouseUpLDemolishRegion: cellPointX=%d, cellPointZ=%d, bCellPicked=%d",
+					currentViewControl->cellPointX, currentViewControl->cellPointZ, currentViewControl->bCellPicked);
+				
+				// Log unknown2 array contents when cell points might be invalid
+				if (currentViewControl->cellPointX == -1 || currentViewControl->cellPointZ == -1 || 
+					currentViewControl->cellPointX == 0 || currentViewControl->cellPointZ == 0)
+				{
+					std::string unknown2Hex;
+					for (int i = 0; i < 27; i++)
+					{
+						char hexBuf[4];
+						sprintf_s(hexBuf, "%02X", currentViewControl->unknown2[i]);
+						if (i > 0) unknown2Hex += " ";
+						unknown2Hex += hexBuf;
+					}
+					logger.WriteLineFormatted(LogLevel::Debug,
+						"OnMouseUpLDemolishRegion: Cell points invalid, unknown2[27] = %s",
+						unknown2Hex.c_str());
+				}
+			}
+			else
+			{
+				logger.WriteLineFormatted(LogLevel::Debug,
+					"OnMouseUpLDemolishRegion: currentViewControl is null!");
+			}
 			
 			// Pass the actual drag start point from the view control
 			SC4CellRegion<int32_t> diagonalRegion = CreateDiagonalRegion(
