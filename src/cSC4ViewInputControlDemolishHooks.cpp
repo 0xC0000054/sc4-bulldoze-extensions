@@ -781,23 +781,6 @@ namespace
 				"DemolishPreview: cellPointX=%d, cellPointZ=%d, bCellPicked=%d",
 				pViewControl->cellPointX, pViewControl->cellPointZ, pViewControl->bCellPicked);
 			
-			// Log unknown2 array contents when cell points might be invalid
-			if (pViewControl->cellPointX == -1 || pViewControl->cellPointZ == -1 || 
-				pViewControl->cellPointX == 0 || pViewControl->cellPointZ == 0)
-			{
-				std::string unknown2Hex;
-				for (int i = 0; i < 27; i++)
-				{
-					char hexBuf[4];
-					sprintf_s(hexBuf, "%02X", pViewControl->unknown2[i]);
-					if (i > 0) unknown2Hex += " ";
-					unknown2Hex += hexBuf;
-				}
-				logger.WriteLineFormatted(LogLevel::Debug,
-					"DemolishPreview: Cell points invalid, unknown2[27] = %s",
-					unknown2Hex.c_str());
-			}
-			
 			// Create diagonal region
 			// Pass the actual drag start point from the view control
 			SC4CellRegion<int32_t> diagonalRegion = CreateDiagonalRegion(
@@ -941,6 +924,18 @@ namespace
 		}
 
 		// Normal rectangular bulldoze execution
+
+		std::string unknown2Hex;
+		for (int i = 0; i < 27; i++)
+		{
+			char hexBuf[4];
+			sprintf_s(hexBuf, "%02X", currentViewControl->unknown2[i]);
+			if (i > 0) unknown2Hex += " ";
+			unknown2Hex += hexBuf;
+		}
+		logger.WriteLineFormatted(LogLevel::Debug,
+			"Demolish, unknown2[27] = %s",
+			unknown2Hex.c_str());
 
 		return DemolishRegion(
 			pDemolition,
