@@ -28,9 +28,12 @@ namespace cSC4ViewInputControlDemolishHooks
 {
 	enum BulldozeCursor : uint32_t
 	{
-		 BulldozeCursorDefault = 0xE1855ADC,
-		 BulldozeCursorFlora = 0xED0E06AD,
-		 BulldozeCursorNetwork = 0x24ADE8F2,
+		BulldozeCursorDefault = 0xE1855ADC,
+		BulldozeCursorFlora = 0xED0E06AD,
+		BulldozeCursorNetwork = 0x24ADE8F2,
+		BulldozeCursorDefaultDiagonal = 0xE1855ADD,
+		BulldozeCursorFloraDiagonal = 0xED0E06AE,
+		BulldozeCursorNetworkDiagonal = 0x24ADE8F3,
 	};
 
 	cRZAutoRefCount<cISC4ViewInputControl> CreateViewInputControl(BulldozeCursor cursor);
