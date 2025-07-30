@@ -20,7 +20,6 @@
  */
 
 #include "cSC4ViewInputControlDemolishHooks.h"
-#include "wil/result.h"
 #include "cIGZAllocatorService.h"
 #include "cISC4Demolition.h"
 #include "cISC4OccupantFilter.h"
@@ -128,14 +127,14 @@ namespace
 
 		// Determine diagonal direction based on click position relative to bounding box
 		int32_t diagStartX, diagStartZ, diagEndX, diagEndZ;
-
+		
 		if (startX != -1 && startZ != -1)
 		{
 			// Use the reliable click coordinates to determine diagonal direction
 			// Simply draw from the click point to the opposite corner
 			int32_t centerX = (minX + maxX) / 2;
 			int32_t centerZ = (minZ + maxZ) / 2;
-
+			
 			if (startX <= centerX && startZ <= centerZ)
 			{
 				// Click in northwest area -> draw NW to SE
@@ -193,7 +192,7 @@ namespace
 				startOffset = diagonalThickness + 1;
 				endOffset = 0;
 			}
-
+			
 			for (int32_t thickOffset = startOffset; thickOffset <= endOffset; thickOffset++)
 			{
 				// Calculate perpendicular offset based on line direction
@@ -207,7 +206,7 @@ namespace
 					perpX = currentX + thickOffset;
 					perpZ = currentZ;
 				}
-
+				
 				int32_t cellX = perpX - minX;
 				int32_t cellZ = perpZ - minZ;
 				if (cellX >= 0 && cellX < (maxX - minX + 1) && cellZ >= 0 && cellZ < (maxZ - minZ + 1))
@@ -519,6 +518,38 @@ namespace
 		long demolishEffectX,
 		long demolishEffectZ)
 	{
+		// Set preview colors based on bulldoze mode
+		if (currentViewControl)
+		{
+			float floraColor[4] = { 0.38f, 0.69f, 0.38f, 0.5f };   // Green for flora/nature
+			float networkColor[4] = { 0.98f, 0.60f, 0.20f, 0.5f }; // Orange for networks/infrastructure
+			float normalColor[4] = { 0.30f, 0.60f, 0.85f, 0.5f };   // Blue for standard
+			
+			float* colorToUse = nullptr;
+			
+			switch (occupantFilterType)
+			{
+			case OccupantFilterType::Flora:
+				colorToUse = floraColor;
+				break;
+			case OccupantFilterType::Network:
+				colorToUse = networkColor;
+				break;
+			case OccupantFilterType::None:
+			default:
+				colorToUse = normalColor;
+				break;
+			}
+			
+			if (colorToUse != nullptr)
+			{
+				S3DColorFloat* previewColor = &(currentViewControl->demolishOK);
+				previewColor->r = colorToUse[0];
+				previewColor->g = colorToUse[1];
+				previewColor->b = colorToUse[2];
+				previewColor->a = colorToUse[3];
+			}
+		}
 		
 		// Apply diagonal modification if enabled and we have valid view control
 		if (diagonalMode && currentViewControl && currentViewControl->pCellRegion)
