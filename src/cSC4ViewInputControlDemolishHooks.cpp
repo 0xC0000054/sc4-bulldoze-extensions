@@ -125,175 +125,39 @@ namespace
 		// Create region with all cells initially false
 		SC4CellRegion<int32_t> region(minX, minZ, maxX, maxZ, false);
 
-		// STABLE ENDPOINT CALCULATION: Use the original drag coordinates (x1,z1) and (x2,z2)
-		// instead of always using bounds corners. This prevents jumping during drag operations.
+		// Determine diagonal direction based on click position relative to bounding box
 		int32_t diagStartX, diagStartZ, diagEndX, diagEndZ;
 		
 		if (startX != -1 && startZ != -1)
 		{
-			// Handle start points that might be outside bounds
-			// This can happen when the drag starts on one cell but the final bounds exclude it for some reason. Fixes issues in built-up cities.
+			// Use the reliable click coordinates to determine diagonal direction
+			// Simply draw from the click point to the opposite corner
+			int32_t centerX = (minX + maxX) / 2;
+			int32_t centerZ = (minZ + maxZ) / 2;
 			
-			// First, try exact corner matching
-			if (startX == minX && startZ == minZ)
+			if (startX <= centerX && startZ <= centerZ)
 			{
-				// Started from top-left -> draw to bottom-right
+				// Click in northwest area -> draw NW to SE
 				diagStartX = minX; diagStartZ = minZ;
 				diagEndX = maxX; diagEndZ = maxZ;
 			}
-			else if (startX == maxX && startZ == minZ)
+			else if (startX > centerX && startZ <= centerZ)
 			{
-				// Started from top-right -> draw to bottom-left  
+				// Click in northeast area -> draw NE to SW
 				diagStartX = maxX; diagStartZ = minZ;
 				diagEndX = minX; diagEndZ = maxZ;
 			}
-			else if (startX == minX && startZ == maxZ)
+			else if (startX <= centerX && startZ > centerZ)
 			{
-				// Started from bottom-left -> draw to top-right
+				// Click in southwest area -> draw SW to NE
 				diagStartX = minX; diagStartZ = maxZ;
 				diagEndX = maxX; diagEndZ = minZ;
 			}
-			else if (startX == maxX && startZ == maxZ)
-			{
-				// Started from bottom-right -> draw to top-left
-				diagStartX = maxX; diagStartZ = maxZ;
-				diagEndX = minX; diagEndZ = minZ;
-			}
 			else
 			{
-				// Start point doesn't match corners exactly
-				// Try to infer direction based on which side of bounds the start point is on
-				
-				// Determine which quadrant/edge relative to bounds the start point is in
-				bool startIsLeft = startX < minX;      // Strictly less than (outside left edge)
-				bool startIsTop = startZ < minZ;       // Strictly less than (outside top edge)  
-				bool startIsRight = startX > maxX;     // Strictly greater than (outside right edge)
-				bool startIsBottom = startZ > maxZ;    // Strictly greater than (outside bottom edge)
-				bool startOnLeftEdge = startX == minX;  // Exactly on left edge
-				bool startOnTopEdge = startZ == minZ;   // Exactly on top edge
-				bool startOnRightEdge = startX == maxX; // Exactly on right edge
-				bool startOnBottomEdge = startZ == maxZ; // Exactly on bottom edge
-				
-				if (startIsLeft && startIsTop)
-				{
-					// Start is northwest of bounds -> diagonal TL to BR
-					diagStartX = minX; diagStartZ = minZ;
-					diagEndX = maxX; diagEndZ = maxZ;
-				}
-				else if (startIsRight && startIsTop)
-				{
-					// Start is northeast of bounds -> diagonal TR to BL
-					diagStartX = maxX; diagStartZ = minZ;
-					diagEndX = minX; diagEndZ = maxZ;
-				}
-				else if (startIsLeft && startIsBottom)
-				{
-					// Start is southwest of bounds -> diagonal BL to TR
-					diagStartX = minX; diagStartZ = maxZ;
-					diagEndX = maxX; diagEndZ = minZ;
-				}
-				else if (startIsRight && startIsBottom)
-				{
-					// Start is southeast of bounds -> diagonal BR to TL
-					diagStartX = maxX; diagStartZ = maxZ;
-					diagEndX = minX; diagEndZ = minZ;
-				}
-				// Handle edge cases where start point is on an edge or inside bounds
-				else if (startOnLeftEdge || startIsLeft)
-				{
-					// On or near left edge - determine vertical direction
-					if (startZ <= minZ + (maxZ - minZ) / 2)
-					{
-						// Closer to top -> TL to BR
-						diagStartX = minX; diagStartZ = minZ;
-						diagEndX = maxX; diagEndZ = maxZ;
-					}
-					else
-					{
-						// Closer to bottom -> BL to TR
-						diagStartX = minX; diagStartZ = maxZ;
-						diagEndX = maxX; diagEndZ = minZ;
-					}
-				}
-				else if (startOnRightEdge || startIsRight)
-				{
-					// On or near right edge - determine vertical direction
-					if (startZ <= minZ + (maxZ - minZ) / 2)
-					{
-						// Closer to top -> TR to BL
-						diagStartX = maxX; diagStartZ = minZ;
-						diagEndX = minX; diagEndZ = maxZ;
-					}
-					else
-					{
-						// Closer to bottom -> BR to TL
-						diagStartX = maxX; diagStartZ = maxZ;  
-						diagEndX = minX; diagEndZ = minZ;
-					}
-				}
-				else if (startOnTopEdge || startIsTop)
-				{
-					// On or near top edge - determine horizontal direction
-					if (startX <= minX + (maxX - minX) / 2)
-					{
-						// Closer to left -> TL to BR
-						diagStartX = minX; diagStartZ = minZ;
-						diagEndX = maxX; diagEndZ = maxZ;
-					}
-					else
-					{
-						// Closer to right -> TR to BL
-						diagStartX = maxX; diagStartZ = minZ;
-						diagEndX = minX; diagEndZ = maxZ;
-					}
-				}
-				else if (startOnBottomEdge || startIsBottom)
-				{
-					// On or near bottom edge - determine horizontal direction
-					if (startX <= minX + (maxX - minX) / 2)
-					{
-						// Closer to left -> BL to TR
-						diagStartX = minX; diagStartZ = maxZ;
-						diagEndX = maxX; diagEndZ = minZ;
-					}
-					else
-					{
-						// Closer to right -> BR to TL
-						diagStartX = maxX; diagStartZ = maxZ;
-						diagEndX = minX; diagEndZ = minZ;
-					}
-				}
-				else
-				{
-					// Inside bounds or other edge case - use position relative to center
-					int32_t centerX = minX + (maxX - minX) / 2;
-					int32_t centerZ = minZ + (maxZ - minZ) / 2;
-					
-					if (startX <= centerX && startZ <= centerZ)
-					{
-						// Northwest quadrant within bounds -> TL to BR
-						diagStartX = minX; diagStartZ = minZ;
-						diagEndX = maxX; diagEndZ = maxZ;
-					}
-					else if (startX > centerX && startZ <= centerZ)
-					{
-						// Northeast quadrant within bounds -> TR to BL
-						diagStartX = maxX; diagStartZ = minZ;
-						diagEndX = minX; diagEndZ = maxZ;
-					}
-					else if (startX <= centerX && startZ > centerZ)
-					{
-						// Southwest quadrant within bounds -> BL to TR
-						diagStartX = minX; diagStartZ = maxZ;
-						diagEndX = maxX; diagEndZ = minZ;
-					}
-					else
-					{
-						// Southeast quadrant within bounds -> BR to TL
-						diagStartX = maxX; diagStartZ = maxZ;
-						diagEndX = minX; diagEndZ = minZ;
-					}
-				}
+				// Click in southeast area -> draw SE to NW
+				diagStartX = maxX; diagStartZ = maxZ;
+				diagEndX = minX; diagEndZ = minZ;
 			}
 		}
 		else
@@ -657,8 +521,6 @@ namespace
 		long demolishEffectX,
 		long demolishEffectZ)
 	{
-		Logger& logger = Logger::GetInstance();
-		
 		// Set preview colors based on bulldoze mode
 		if (currentViewControl)
 		{
@@ -698,17 +560,11 @@ namespace
 			cSC4ViewInputControlDemolish* pViewControl = currentViewControl;
 			const auto& bounds = cellRegion.bounds;
 			
-			// LOG: Diagnostic information for preview function
-			logger.WriteLineFormatted(LogLevel::Debug,
-				"DemolishPreview: cellPointX=%d, cellPointZ=%d, bCellPicked=%d",
-				pViewControl->cellPointX, pViewControl->cellPointZ, pViewControl->bCellPicked);
-			
-			// Create diagonal region
-			// Pass the actual drag start point from the view control
+			// Create diagonal region using reliable click coordinates
 			SC4CellRegion<int32_t> diagonalRegion = CreateDiagonalRegion(
 				bounds.topLeftX, bounds.topLeftY,
 				bounds.bottomRightX, bounds.bottomRightY,
-				pViewControl->cellPointX, pViewControl->cellPointZ
+				pViewControl->clickX, pViewControl->clickZ
 			);
 			
 			// Update view control's cellMap contents without changing structure
@@ -895,7 +751,7 @@ bool cSC4ViewInputControlDemolishHooks::Install()
 			InstallUpdateSelectedRegionDemolishRegionHook();
 			InstallOnMouseUpLDemolishRegionHook();
 
-			logger.WriteLine(LogLevel::Info, "Installed the bulldozer extensions (with preview colors).");
+			logger.WriteLine(LogLevel::Info, "Installed the bulldozer extensions.");
 			installed = true;
 		}
 		catch (const wil::ResultException& e)
