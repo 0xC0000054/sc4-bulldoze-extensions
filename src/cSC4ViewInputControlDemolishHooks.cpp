@@ -110,6 +110,7 @@ namespace
 	static OccupantFilterType occupantFilterType = OccupantFilterType::None;
 	static bool diagonalMode = false;
 	static int32_t diagonalThickness = 1; // Default thickness is 1 (single line)
+	static int32_t maxDiagonalThickness = 9;
 	static cSC4ViewInputControlDemolish* currentViewControl = nullptr;
 
 
@@ -350,15 +351,15 @@ namespace
 			
 			if (wheelDelta > 0)
 			{
-				// Scroll up - increase thickness (max 5, skip 0)
+				// Scroll up - increase thickness (skip 0)
 				if (diagonalThickness == -1) diagonalThickness = 1;
-				else diagonalThickness = (std::min)(diagonalThickness + 1, 5);
+				else diagonalThickness = (std::min)(diagonalThickness + 1, maxDiagonalThickness);
 			}
 			else if (wheelDelta < 0)
 			{
-				// Scroll down - decrease thickness (min -5, skip 0)
+				// Scroll down - decrease thickness (skip 0)
 				if (diagonalThickness == 1) diagonalThickness = -1;
-				else diagonalThickness = (std::max)(diagonalThickness - 1, -5);
+				else diagonalThickness = (std::max)(diagonalThickness - 1, -maxDiagonalThickness);
 			}
 			
 			if (diagonalThickness != oldThickness)
