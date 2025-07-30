@@ -67,7 +67,13 @@ namespace
 		cISC4OccupantFilter* pDemolishableOccupantFilter;
 		void* pOccupantManager;								// cISC4OccupantManager*
 		uint8_t bCellPicked;
-		uint8_t unknown2[27];
+		uint8_t unknown2[3];								// I have seen (very rarely) garbage here, but usually 0
+		int32_t lotMinX;									// Lot bounding box min X for lot bulldoze, drag start X otherwise
+		int32_t lotMinZ;									// Lot bounding box min Z for lot bulldoze, drag start Z otherwise
+		int32_t lotMaxX;									// Lot bounding box max X for lot bulldoze, drag start X otherwise
+		int32_t lotMaxZ;									// Lot bounding box max Z for lot bulldoze, drag start Z otherwise
+		int32_t clickX;										// X cell where the user clicked
+		int32_t clickZ;										// Z cell where the user clicked
 		int32_t cellPointX;
 		int32_t cellPointZ;
 		SC4CellRegion<int32_t>* pCellRegion;
