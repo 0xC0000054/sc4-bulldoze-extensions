@@ -49,8 +49,12 @@ static constexpr uint32_t kSC4MessagePostCityInit = 0x26D31EC1;
 static constexpr uint32_t kSC4MessagePreCityShutdown = 0x26D31EC2;
 static constexpr uint32_t kSC4MessageCityEstablished = 0x26D31EC4;
 
+static constexpr uint32_t BulldozeDiagonalShortcutID = 0x6A935D37;
 static constexpr uint32_t BulldozeFloraShortcutID = 0x755C6E40;
+static constexpr uint32_t BulldozeFloraDiagonalShortcutID = 0x755C6E41;
 static constexpr uint32_t BulldozeNetworkShortcutID = 0x5ECED6AE;
+static constexpr uint32_t BulldozeNetworkDiagonalShortcutID = 0x5ECED6AF;
+
 
 class BulldozeExtensionsDllDirector final : public cRZMessage2COMDirector
 {
@@ -100,8 +104,11 @@ private:
 				{
 					pAcceleratorRes->RegisterResources(pView3D->GetKeyAccelerator());
 
+					ms2.AddNotification(this, BulldozeDiagonalShortcutID);
 					ms2.AddNotification(this, BulldozeFloraShortcutID);
+					ms2.AddNotification(this, BulldozeFloraDiagonalShortcutID);
 					ms2.AddNotification(this, BulldozeNetworkShortcutID);
+					ms2.AddNotification(this, BulldozeNetworkDiagonalShortcutID);
 				}
 			}
 		}
@@ -113,8 +120,11 @@ private:
 
 		if (pMS2)
 		{
+			pMS2->RemoveNotification(this, BulldozeDiagonalShortcutID);
 			pMS2->RemoveNotification(this, BulldozeFloraShortcutID);
+			pMS2->RemoveNotification(this, BulldozeFloraDiagonalShortcutID);
 			pMS2->RemoveNotification(this, BulldozeNetworkShortcutID);
+			pMS2->RemoveNotification(this, BulldozeNetworkDiagonalShortcutID);
 		}
 	}
 
@@ -199,12 +209,20 @@ private:
 		case kSC4MessagePreCityShutdown:
 			PreCityShutdown();
 			break;
+		case BulldozeDiagonalShortcutID:
+			ActivateBulldozeTool(cSC4ViewInputControlDemolishHooks::BulldozeCursorDefaultDiagonal);
+			break;
 		case BulldozeFloraShortcutID:
 			ActivateBulldozeTool(cSC4ViewInputControlDemolishHooks::BulldozeCursorFlora);
+			break;
+		case BulldozeFloraDiagonalShortcutID:
+			ActivateBulldozeTool(cSC4ViewInputControlDemolishHooks::BulldozeCursorFloraDiagonal);
 			break;
 		case BulldozeNetworkShortcutID:
 			ActivateBulldozeTool(cSC4ViewInputControlDemolishHooks::BulldozeCursorNetwork);
 			break;
+		case BulldozeNetworkDiagonalShortcutID:
+			ActivateBulldozeTool(cSC4ViewInputControlDemolishHooks::BulldozeCursorNetworkDiagonal);
 		}
 
 		return true;
