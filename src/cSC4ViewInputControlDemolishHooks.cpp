@@ -116,13 +116,6 @@ namespace
 	// Helper function to create a diagonal region from two points with drag direction detection and thickness
 	SC4CellRegion<int32_t> CreateDiagonalRegion(int32_t x1, int32_t z1, int32_t x2, int32_t z2, int32_t startX = -1, int32_t startZ = -1)
 	{
-		Logger& logger = Logger::GetInstance();
-
-		// LOG: Diagnostic information about cell points
-		logger.WriteLineFormatted(LogLevel::Debug,
-			"CreateDiagonalRegion: bounds=(%d,%d) to (%d,%d), startPoint=(%d,%d)",
-			x1, z1, x2, z2, startX, startZ);
-
 		// Calculate bounding box for the region
 		int32_t minX = (std::min)(x1, x2);
 		int32_t maxX = (std::max)(x1, x2);
@@ -147,36 +140,29 @@ namespace
 				// Started from top-left -> draw to bottom-right
 				diagStartX = minX; diagStartZ = minZ;
 				diagEndX = maxX; diagEndZ = maxZ;
-				logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Exact match TL->BR");
 			}
 			else if (startX == maxX && startZ == minZ)
 			{
 				// Started from top-right -> draw to bottom-left  
 				diagStartX = maxX; diagStartZ = minZ;
 				diagEndX = minX; diagEndZ = maxZ;
-				logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Exact match TR->BL");
 			}
 			else if (startX == minX && startZ == maxZ)
 			{
 				// Started from bottom-left -> draw to top-right
 				diagStartX = minX; diagStartZ = maxZ;
 				diagEndX = maxX; diagEndZ = minZ;
-				logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Exact match BL->TR");
 			}
 			else if (startX == maxX && startZ == maxZ)
 			{
 				// Started from bottom-right -> draw to top-left
 				diagStartX = maxX; diagStartZ = maxZ;
 				diagEndX = minX; diagEndZ = minZ;
-				logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Exact match BR->TL");
 			}
 			else
 			{
 				// Start point doesn't match corners exactly
 				// Try to infer direction based on which side of bounds the start point is on
-				logger.WriteLineFormatted(LogLevel::Debug,
-					"CreateDiagonalRegion: Start point (%d,%d) outside bounds (%d,%d) to (%d,%d), inferring direction",
-					startX, startZ, minX, minZ, maxX, maxZ);
 				
 				// Determine which quadrant/edge relative to bounds the start point is in
 				bool startIsLeft = startX < minX;      // Strictly less than (outside left edge)
@@ -193,28 +179,24 @@ namespace
 					// Start is northwest of bounds -> diagonal TL to BR
 					diagStartX = minX; diagStartZ = minZ;
 					diagEndX = maxX; diagEndZ = maxZ;
-					logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Inferred NW quadrant->SE (TL->BR)");
 				}
 				else if (startIsRight && startIsTop)
 				{
 					// Start is northeast of bounds -> diagonal TR to BL
 					diagStartX = maxX; diagStartZ = minZ;
 					diagEndX = minX; diagEndZ = maxZ;
-					logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Inferred NE quadrant->SW (TR->BL)");
 				}
 				else if (startIsLeft && startIsBottom)
 				{
 					// Start is southwest of bounds -> diagonal BL to TR
 					diagStartX = minX; diagStartZ = maxZ;
 					diagEndX = maxX; diagEndZ = minZ;
-					logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Inferred SW quadrant->NE (BL->TR)");
 				}
 				else if (startIsRight && startIsBottom)
 				{
 					// Start is southeast of bounds -> diagonal BR to TL
 					diagStartX = maxX; diagStartZ = maxZ;
 					diagEndX = minX; diagEndZ = minZ;
-					logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Inferred SE quadrant->NW (BR->TL)");
 				}
 				// Handle edge cases where start point is on an edge or inside bounds
 				else if (startOnLeftEdge || startIsLeft)
@@ -225,14 +207,12 @@ namespace
 						// Closer to top -> TL to BR
 						diagStartX = minX; diagStartZ = minZ;
 						diagEndX = maxX; diagEndZ = maxZ;
-						logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Left edge, upper half->SE (TL->BR)");
 					}
 					else
 					{
 						// Closer to bottom -> BL to TR
 						diagStartX = minX; diagStartZ = maxZ;
 						diagEndX = maxX; diagEndZ = minZ;
-						logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Left edge, lower half->NE (BL->TR)");
 					}
 				}
 				else if (startOnRightEdge || startIsRight)
@@ -243,14 +223,12 @@ namespace
 						// Closer to top -> TR to BL
 						diagStartX = maxX; diagStartZ = minZ;
 						diagEndX = minX; diagEndZ = maxZ;
-						logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Right edge, upper half->SW (TR->BL)");
 					}
 					else
 					{
 						// Closer to bottom -> BR to TL
 						diagStartX = maxX; diagStartZ = maxZ;  
 						diagEndX = minX; diagEndZ = minZ;
-						logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Right edge, lower half->NW (BR->TL)");
 					}
 				}
 				else if (startOnTopEdge || startIsTop)
@@ -261,14 +239,12 @@ namespace
 						// Closer to left -> TL to BR
 						diagStartX = minX; diagStartZ = minZ;
 						diagEndX = maxX; diagEndZ = maxZ;
-						logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Top edge, left half->SE (TL->BR)");
 					}
 					else
 					{
 						// Closer to right -> TR to BL
 						diagStartX = maxX; diagStartZ = minZ;
 						diagEndX = minX; diagEndZ = maxZ;
-						logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Top edge, right half->SW (TR->BL)");
 					}
 				}
 				else if (startOnBottomEdge || startIsBottom)
@@ -279,14 +255,12 @@ namespace
 						// Closer to left -> BL to TR
 						diagStartX = minX; diagStartZ = maxZ;
 						diagEndX = maxX; diagEndZ = minZ;
-						logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Bottom edge, left half->NE (BL->TR)");
 					}
 					else
 					{
 						// Closer to right -> BR to TL
 						diagStartX = maxX; diagStartZ = maxZ;
 						diagEndX = minX; diagEndZ = minZ;
-						logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Bottom edge, right half->NW (BR->TL)");
 					}
 				}
 				else
@@ -300,28 +274,24 @@ namespace
 						// Northwest quadrant within bounds -> TL to BR
 						diagStartX = minX; diagStartZ = minZ;
 						diagEndX = maxX; diagEndZ = maxZ;
-						logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Inside bounds, NW->SE (TL->BR)");
 					}
 					else if (startX > centerX && startZ <= centerZ)
 					{
 						// Northeast quadrant within bounds -> TR to BL
 						diagStartX = maxX; diagStartZ = minZ;
 						diagEndX = minX; diagEndZ = maxZ;
-						logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Inside bounds, NE->SW (TR->BL)");
 					}
 					else if (startX <= centerX && startZ > centerZ)
 					{
 						// Southwest quadrant within bounds -> BL to TR
 						diagStartX = minX; diagStartZ = maxZ;
 						diagEndX = maxX; diagEndZ = minZ;
-						logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Inside bounds, SW->NE (BL->TR)");
 					}
 					else
 					{
 						// Southeast quadrant within bounds -> BR to TL
 						diagStartX = maxX; diagStartZ = maxZ;
 						diagEndX = minX; diagEndZ = minZ;
-						logger.WriteLineFormatted(LogLevel::Debug, "CreateDiagonalRegion: Inside bounds, SE->NW (BR->TL)");
 					}
 				}
 			}
@@ -329,8 +299,6 @@ namespace
 		else
 		{
 			// No start point provided - use default NW-to-SE diagonal
-			logger.WriteLineFormatted(LogLevel::Debug,
-				"CreateDiagonalRegion: No start point provided, defaulting to NW-SE diagonal");
 			diagStartX = minX; diagStartZ = minZ;
 			diagEndX = maxX; diagEndZ = maxZ;
 		}
@@ -398,9 +366,6 @@ namespace
 			}
 		}
 
-		logger.WriteLineFormatted(LogLevel::Debug, 
-			"Created diagonal line: %d tiles, thickness=%d", tileCount, diagonalThickness);
-
 		return region;
 	}
 
@@ -452,36 +417,12 @@ namespace
 				{
 					// Get current rectangular bounds
 					const auto& bounds = pThis->pCellRegion->bounds;
-					
-					// LOG: Diagnostic information about cell points and unknown2 array
-					Logger& logger = Logger::GetInstance();
-					logger.WriteLineFormatted(LogLevel::Debug,
-						"SetOccupantFilterOption: cellPointX=%d, cellPointZ=%d, bCellPicked=%d",
-						pThis->cellPointX, pThis->cellPointZ, pThis->bCellPicked);
 
-					// Log unknown2 array contents when cell points might be invalid
-					if (pThis->cellPointX == -1 || pThis->cellPointZ == -1 || 
-						pThis->cellPointX == 0 || pThis->cellPointZ == 0)
-					{
-						std::string unknown2Hex;
-						for (int i = 0; i < 27; i++)
-						{
-							char hexBuf[4];
-							sprintf_s(hexBuf, "%02X", pThis->unknown2[i]);
-							if (i > 0) unknown2Hex += " ";
-							unknown2Hex += hexBuf;
-						}
-						logger.WriteLineFormatted(LogLevel::Debug,
-							"SetOccupantFilterOption: Cell points invalid, unknown2[27] = %s",
-							unknown2Hex.c_str());
-					}
-
-					// Create diagonal region to get the cell pattern
-					// Pass the actual drag start point from the view control
+					// Create diagonal region using reliable click coordinates
 					SC4CellRegion<int32_t> diagonalRegion = CreateDiagonalRegion(
 						bounds.topLeftX, bounds.topLeftY,
 						bounds.bottomRightX, bounds.bottomRightY,
-						pThis->cellPointX, pThis->cellPointZ
+						pThis->clickX, pThis->clickZ
 					);
 					
 					// Only modify the cellMap contents, not the structure
@@ -536,8 +477,6 @@ namespace
 		uint32_t modifiers,
 		int32_t wheelDelta)
 	{
-		Logger& logger = Logger::GetInstance();
-		
 		// Check if we're in diagonal mode and Alt is held
 		if (diagonalMode && (modifiers & ModifierKeyFlagAlt))
 		{
@@ -558,10 +497,7 @@ namespace
 			}
 			
 			if (diagonalThickness != oldThickness)
-			{
-				logger.WriteLineFormatted(LogLevel::Debug,
-					"Diagonal thickness: %d -> %d", oldThickness, diagonalThickness);
-				
+			{			
 				// Update preview if we have an active selection
 				if (pThis->bCellPicked && pThis->pCellRegion)
 				{
@@ -723,56 +659,36 @@ namespace
 	{
 		Logger& logger = Logger::GetInstance();
 		
-		// Try to modify preview colors using our global view control pointer
+		// Set preview colors based on bulldoze mode
 		if (currentViewControl)
 		{
-			// Intuitive color scheme with alpha blending:
-			// RGBA format: [0]=Red, [1]=Green, [2]=Blue, [3]=Alpha
 			float floraColor[4] = { 0.38f, 0.69f, 0.38f, 0.5f };   // Green for flora/nature
 			float networkColor[4] = { 0.98f, 0.60f, 0.20f, 0.5f }; // Orange for networks/infrastructure
-			
-			// Define blue color for standard bulldoze (classic demolish color)
 			float normalColor[4] = { 0.30f, 0.60f, 0.85f, 0.5f };   // Blue for standard
 			
 			float* colorToUse = nullptr;
-			const char* modeName = "Normal";
 			
 			switch (occupantFilterType)
 			{
 			case OccupantFilterType::Flora:
 				colorToUse = floraColor;
-				modeName = "Flora";
 				break;
 			case OccupantFilterType::Network:
 				colorToUse = networkColor;
-				modeName = "Network";
 				break;
 			case OccupantFilterType::None:
 			default:
 				colorToUse = normalColor;
-				modeName = "Normal";
 				break;
 			}
 			
 			if (colorToUse != nullptr)
 			{
-				// Direct access to demolishOK (main preview color array)
 				S3DColorFloat* previewColor = &(currentViewControl->demolishOK);
-				
-				// Debug logging: show before and after colors
-				logger.WriteLineFormatted(LogLevel::Trace,
-					"Preview color BEFORE %s: R=%.3f, G=%.3f, B=%.3f, A=%.3f",
-					modeName, previewColor->r, previewColor->g, previewColor->b, previewColor->a);
-
-				// Set preview color
-				previewColor->r = colorToUse[0]; // Red
-				previewColor->g = colorToUse[1]; // Green
-				previewColor->b = colorToUse[2]; // Blue
-				previewColor->a = colorToUse[3]; // Alpha
-				
-				logger.WriteLineFormatted(LogLevel::Trace, 
-					"Preview color AFTER %s: R=%.3f, G=%.3f, B=%.3f, A=%.3f", 
-					modeName, previewColor->r, previewColor->g, previewColor->b, previewColor->a);
+				previewColor->r = colorToUse[0];
+				previewColor->g = colorToUse[1];
+				previewColor->b = colorToUse[2];
+				previewColor->a = colorToUse[3];
 			}
 		}
 		
@@ -870,49 +786,18 @@ namespace
 		long demolishEffectX,
 		long demolishEffectZ)
 	{
-		Logger& logger = Logger::GetInstance();
 		
 		// Apply diagonal modification if enabled
 		if (diagonalMode)
 		{
 			const auto& bounds = cellRegion.bounds;
 			
-			// LOG: Diagnostic information for actual demolish function
-			if (currentViewControl)
-			{
-				logger.WriteLineFormatted(LogLevel::Debug,
-					"OnMouseUpLDemolishRegion: cellPointX=%d, cellPointZ=%d, bCellPicked=%d",
-					currentViewControl->cellPointX, currentViewControl->cellPointZ, currentViewControl->bCellPicked);
-				
-				// Log unknown2 array contents when cell points might be invalid
-				if (currentViewControl->cellPointX == -1 || currentViewControl->cellPointZ == -1 || 
-					currentViewControl->cellPointX == 0 || currentViewControl->cellPointZ == 0)
-				{
-					std::string unknown2Hex;
-					for (int i = 0; i < 27; i++)
-					{
-						char hexBuf[4];
-						sprintf_s(hexBuf, "%02X", currentViewControl->unknown2[i]);
-						if (i > 0) unknown2Hex += " ";
-						unknown2Hex += hexBuf;
-					}
-					logger.WriteLineFormatted(LogLevel::Debug,
-						"OnMouseUpLDemolishRegion: Cell points invalid, unknown2[27] = %s",
-						unknown2Hex.c_str());
-				}
-			}
-			else
-			{
-				logger.WriteLineFormatted(LogLevel::Debug,
-					"OnMouseUpLDemolishRegion: currentViewControl is null!");
-			}
-			
-			// Pass the actual drag start point from the view control
+			// Create diagonal region using reliable click coordinates
 			SC4CellRegion<int32_t> diagonalRegion = CreateDiagonalRegion(
 				bounds.topLeftX, bounds.topLeftY,
 				bounds.bottomRightX, bounds.bottomRightY,
-				currentViewControl ? currentViewControl->cellPointX : -1,
-				currentViewControl ? currentViewControl->cellPointZ : -1
+				currentViewControl ? currentViewControl->clickX : -1,
+				currentViewControl ? currentViewControl->clickZ : -1
 			);
 			
 			return DemolishRegion(
@@ -930,18 +815,6 @@ namespace
 		}
 
 		// Normal rectangular bulldoze execution
-
-		std::string unknown2Hex;
-		for (int i = 0; i < 27; i++)
-		{
-			char hexBuf[4];
-			sprintf_s(hexBuf, "%02X", currentViewControl->unknown2[i]);
-			if (i > 0) unknown2Hex += " ";
-			unknown2Hex += hexBuf;
-		}
-		logger.WriteLineFormatted(LogLevel::Debug,
-			"Demolish, unknown2[27] = %s",
-			unknown2Hex.c_str());
 
 		return DemolishRegion(
 			pDemolition,
