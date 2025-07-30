@@ -1,14 +1,23 @@
-///////////////////////////////////////////////////////////////////////////////
-//
-// This file is part of sc4-bulldoze-extensions, a DLL Plugin for SimCity 4
-// that extends the bulldoze tool.
-//
-// Copyright (c) 2024 Nicholas Hayes
-//
-// This file is licensed under terms of the MIT License.
-// See LICENSE.txt for more information.
-//
-///////////////////////////////////////////////////////////////////////////////
+/*
+ * This file is part of sc4-bulldoze-extensions, a DLL Plugin for
+ * SimCity 4 extends the bulldoze tool.
+ *
+ * Copyright (C) 2024, 2025 Nicholas Hayes
+ *
+ * sc4-bulldoze-extensions is free software: you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
+ * sc4-bulldoze-extensions is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with SC4ClearPollution.
+ * If not, see <http://www.gnu.org/licenses/>.
+ */
 
 #include "cSC4ViewInputControlDemolishHooks.h"
 #include "wil/result.h"
@@ -31,6 +40,14 @@
 
 namespace
 {
+	struct S3DColorFloat
+	{
+		float r;
+		float g;
+		float b;
+		float a;
+	};
+
 	struct cSC4ViewInputControlDemolish : public cISC4ViewInputControl
 	{
 		uint8_t bInitialized;
@@ -57,12 +74,12 @@ namespace
 		uint8_t bValidDemolitionTarget;
 		void* pSelectedOccupant;							// cISC4Occupant*
 		uint8_t unknown3[28];
-		void* pMarkedCellView;                    // 0x90
-		uint32_t bSignPostOccupant;              // 0x94 (4 bytes instead of 1)
-		float colorArray1[4];                    // 0x98-0xA7 (RGBA)
-		float colorArray2[4];                    // 0xA8-0xB7 (RGBA) 
-		float colorArray3[4];                    // 0xB8-0xC7 (RGBA) - Main preview color
-		float colorArray4[4];                    // 0xC8-0xD7 (RGBA)
+		void* pMarkedCellView;
+		uint8_t bSignPostOccupant;
+		S3DColorFloat destroyOK;
+		S3DColorFloat destroyNotOK;
+		S3DColorFloat demolishOK;
+		S3DColorFloat demolishNotOK;
 	};
 
 	static_assert(sizeof(cSC4ViewInputControlDemolish) == 0xd8);
@@ -546,19 +563,19 @@ namespace
 			
 			if (colorToUse != nullptr)
 			{
-				// Direct access to colorArray3 (main preview color array)
-				float* previewColor = currentViewControl->colorArray3;
+				// Direct access to demolishOK (main preview color array)
+				S3DColorFloat previewColor = currentViewControl->demolishOK;
 				
 				// Debug logging: show before and after colors
 				logger.WriteLineFormatted(LogLevel::Debug, 
 					"Preview color BEFORE %s: R=%.3f, G=%.3f, B=%.3f, A=%.3f", 
 					modeName, previewColor[0], previewColor[1], previewColor[2], previewColor[3]);
 				
-				// Set preview color (RGBA format: Red, Green, Blue, Alpha)
-				previewColor[0] = colorToUse[0]; // Red
-				previewColor[1] = colorToUse[1]; // Green
-				previewColor[2] = colorToUse[2]; // Blue
-				previewColor[3] = colorToUse[3]; // Alpha
+				// Set preview color
+				previewColor->r = colorToUse[0]; // Red
+				previewColor->g = colorToUse[1]; // Green
+				previewColor->b = colorToUse[2]; // Blue
+				previewColor->a = colorToUse[3]; // Alpha
 				
 				logger.WriteLineFormatted(LogLevel::Debug, 
 					"Preview color AFTER %s: R=%.3f, G=%.3f, B=%.3f, A=%.3f", 
