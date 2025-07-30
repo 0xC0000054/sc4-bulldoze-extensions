@@ -564,13 +564,13 @@ namespace
 			if (colorToUse != nullptr)
 			{
 				// Direct access to demolishOK (main preview color array)
-				S3DColorFloat previewColor = currentViewControl->demolishOK;
+				S3DColorFloat* previewColor = &(currentViewControl->demolishOK);
 				
 				// Debug logging: show before and after colors
-				logger.WriteLineFormatted(LogLevel::Debug, 
-					"Preview color BEFORE %s: R=%.3f, G=%.3f, B=%.3f, A=%.3f", 
-					modeName, previewColor[0], previewColor[1], previewColor[2], previewColor[3]);
-				
+				logger.WriteLineFormatted(LogLevel::Debug,
+					"Preview color BEFORE %s: R=%.3f, G=%.3f, B=%.3f, A=%.3f",
+					modeName, previewColor->r, previewColor->g, previewColor->b, previewColor->a);
+
 				// Set preview color
 				previewColor->r = colorToUse[0]; // Red
 				previewColor->g = colorToUse[1]; // Green
@@ -579,7 +579,7 @@ namespace
 				
 				logger.WriteLineFormatted(LogLevel::Debug, 
 					"Preview color AFTER %s: R=%.3f, G=%.3f, B=%.3f, A=%.3f", 
-					modeName, previewColor[0], previewColor[1], previewColor[2], previewColor[3]);
+					modeName, previewColor->r, previewColor->g, previewColor->b, previewColor->a);
 			}
 		}
 		
