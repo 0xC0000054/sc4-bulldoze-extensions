@@ -20,6 +20,7 @@
  */
 
 #include "cSC4ViewInputControlDemolishHooks.h"
+#include "wil/result.h"
 #include "cIGZAllocatorService.h"
 #include "cISC4Demolition.h"
 #include "cISC4OccupantFilter.h"
@@ -35,6 +36,8 @@
 #include <Windows.h>
 #include "wil/result.h"
 #include <cstdint>
+#include <algorithm>
+#include <cstdlib>
 
 namespace
 {
@@ -106,6 +109,131 @@ namespace
 	};
 
 	static OccupantFilterType occupantFilterType = OccupantFilterType::None;
+	static bool diagonalMode = false;
+	static int32_t diagonalThickness = 1; // Default thickness is 1 (single line)
+	static cSC4ViewInputControlDemolish* currentViewControl = nullptr;
+
+
+	// Helper function to create a diagonal region from two points with drag direction detection and thickness
+	SC4CellRegion<int32_t> CreateDiagonalRegion(int32_t x1, int32_t z1, int32_t x2, int32_t z2, int32_t startX = -1, int32_t startZ = -1)
+	{
+		// Calculate bounding box for the region
+		int32_t minX = (std::min)(x1, x2);
+		int32_t maxX = (std::max)(x1, x2);
+		int32_t minZ = (std::min)(z1, z2);
+		int32_t maxZ = (std::max)(z1, z2);
+
+		// Create region with all cells initially false
+		SC4CellRegion<int32_t> region(minX, minZ, maxX, maxZ, false);
+
+		// Determine diagonal direction based on click position relative to bounding box
+		int32_t diagStartX, diagStartZ, diagEndX, diagEndZ;
+
+		if (startX != -1 && startZ != -1)
+		{
+			// Use the reliable click coordinates to determine diagonal direction
+			// Simply draw from the click point to the opposite corner
+			int32_t centerX = (minX + maxX) / 2;
+			int32_t centerZ = (minZ + maxZ) / 2;
+
+			if (startX <= centerX && startZ <= centerZ)
+			{
+				// Click in northwest area -> draw NW to SE
+				diagStartX = minX; diagStartZ = minZ;
+				diagEndX = maxX; diagEndZ = maxZ;
+			}
+			else if (startX > centerX && startZ <= centerZ)
+			{
+				// Click in northeast area -> draw NE to SW
+				diagStartX = maxX; diagStartZ = minZ;
+				diagEndX = minX; diagEndZ = maxZ;
+			}
+			else if (startX <= centerX && startZ > centerZ)
+			{
+				// Click in southwest area -> draw SW to NE
+				diagStartX = minX; diagStartZ = maxZ;
+				diagEndX = maxX; diagEndZ = minZ;
+			}
+			else
+			{
+				// Click in southeast area -> draw SE to NW
+				diagStartX = maxX; diagStartZ = maxZ;
+				diagEndX = minX; diagEndZ = minZ;
+			}
+		}
+		else
+		{
+			// No start point provided - use default NW-to-SE diagonal
+			diagStartX = minX; diagStartZ = minZ;
+			diagEndX = maxX; diagEndZ = maxZ;
+		}
+
+		// Use Bresenham's line algorithm to mark diagonal cells
+		int32_t dx = abs(diagEndX - diagStartX);
+		int32_t dz = abs(diagEndZ - diagStartZ);
+		int32_t sx = diagStartX < diagEndX ? 1 : -1;
+		int32_t sz = diagStartZ < diagEndZ ? 1 : -1;
+		int32_t err = dx - dz;
+
+
+		int32_t currentX = diagStartX;
+		int32_t currentZ = diagStartZ;
+		int32_t tileCount = 0;
+
+		while (true)
+		{
+			// Set the current cell and perpendicular cells for thickness
+			// Handle positive/negative thickness values (skip 0)
+			int32_t startOffset, endOffset;
+			if (diagonalThickness > 0) {
+				startOffset = 0;
+				endOffset = diagonalThickness - 1;
+			}
+			else {
+				startOffset = diagonalThickness + 1;
+				endOffset = 0;
+			}
+
+			for (int32_t thickOffset = startOffset; thickOffset <= endOffset; thickOffset++)
+			{
+				// Calculate perpendicular offset based on line direction
+				int32_t perpX, perpZ;
+				if (abs(dx) > abs(dz)) {
+					// More horizontal line - add thickness vertically
+					perpX = currentX;
+					perpZ = currentZ + thickOffset;
+				} else {
+					// More vertical line - add thickness horizontally  
+					perpX = currentX + thickOffset;
+					perpZ = currentZ;
+				}
+
+				int32_t cellX = perpX - minX;
+				int32_t cellZ = perpZ - minZ;
+				if (cellX >= 0 && cellX < (maxX - minX + 1) && cellZ >= 0 && cellZ < (maxZ - minZ + 1))
+				{
+					region.cellMap.SetValue(cellX, cellZ, true);
+					tileCount++;
+				}
+			}
+
+			if (currentX == diagEndX && currentZ == diagEndZ) break;
+
+			int32_t e2 = 2 * err;
+			if (e2 > -dz)
+			{
+				err -= dz;
+				currentX += sx;
+			}
+			if (e2 < dx)
+			{
+				err += dx;
+				currentZ += sz;
+			}
+		}
+
+		return region;
+	}
 
 	typedef bool(__thiscall* cSC4ViewInputControl_IsOnTop)(cISC4ViewInputControl* pThis);
 
@@ -116,28 +244,83 @@ namespace
 	static const cSC4ViewInputControlDemolish_ThiscallFn EndInput = reinterpret_cast<cSC4ViewInputControlDemolish_ThiscallFn>(0x4b9040);
 	static const cSC4ViewInputControlDemolish_ThiscallFn UpdateSelectedRegion = reinterpret_cast<cSC4ViewInputControlDemolish_ThiscallFn>(0x4b93b0);
 
-	void SetOccupantFilterOption(cSC4ViewInputControlDemolish* pThis, OccupantFilterType type)
+
+	void SetOccupantFilterOption(cSC4ViewInputControlDemolish* pThis, OccupantFilterType type, bool diagonal)
 	{
-		if (occupantFilterType != type)
+		// Always store the current view control for use in other hooks
+		currentViewControl = pThis;
+		
+		if (occupantFilterType != type || diagonalMode != diagonal)
 		{
 			occupantFilterType = type;
+			diagonalMode = diagonal;
 
+			// Set cursor based on occupant filter type and diagonal mode
 			switch (occupantFilterType)
 			{
 			case OccupantFilterType::Flora:
-				pThis->SetCursor(cSC4ViewInputControlDemolishHooks::BulldozeCursorFlora);
+				pThis->SetCursor(diagonalMode ? 
+					cSC4ViewInputControlDemolishHooks::BulldozeCursorFloraDiagonal : 
+					cSC4ViewInputControlDemolishHooks::BulldozeCursorFlora);
 				break;
 			case OccupantFilterType::Network:
-				pThis->SetCursor(cSC4ViewInputControlDemolishHooks::BulldozeCursorNetwork);
+				pThis->SetCursor(diagonalMode ? 
+					cSC4ViewInputControlDemolishHooks::BulldozeCursorNetworkDiagonal : 
+					cSC4ViewInputControlDemolishHooks::BulldozeCursorNetwork);
 				break;
 			case OccupantFilterType::None:
 			default:
-				pThis->SetCursor(cSC4ViewInputControlDemolishHooks::BulldozeCursorDefault);
+				pThis->SetCursor(diagonalMode ? 
+					cSC4ViewInputControlDemolishHooks::BulldozeCursorDefaultDiagonal : 
+					cSC4ViewInputControlDemolishHooks::BulldozeCursorDefault);
 				break;
 			}
 
 			if (pThis->bCellPicked)
 			{
+				// Safely modify existing pCellRegion contents
+				if (diagonal && pThis->pCellRegion)
+				{
+					// Get current rectangular bounds
+					const auto& bounds = pThis->pCellRegion->bounds;
+
+					// Create diagonal region using reliable click coordinates
+					SC4CellRegion<int32_t> diagonalRegion = CreateDiagonalRegion(
+						bounds.topLeftX, bounds.topLeftY,
+						bounds.bottomRightX, bounds.bottomRightY,
+						pThis->clickX, pThis->clickZ
+					);
+					
+					// Only modify the cellMap contents, not the structure
+					// Copy diagonal pattern into existing cellMap without changing pointers
+					auto& existingCellMap = pThis->pCellRegion->cellMap;
+					const auto& diagonalCellMap = diagonalRegion.cellMap;
+					
+					// Calculate dimensions from bounds (both regions should have same bounds)
+					const auto& existingBounds = pThis->pCellRegion->bounds;
+					const auto& diagonalBounds = diagonalRegion.bounds;
+					
+					uint32_t width = static_cast<uint32_t>(bounds.bottomRightX - bounds.topLeftX + 1);
+					uint32_t height = static_cast<uint32_t>(bounds.bottomRightY - bounds.topLeftY + 1);
+					
+					// Verify bounds match before copying
+					if (existingBounds.topLeftX == diagonalBounds.topLeftX &&
+						existingBounds.topLeftY == diagonalBounds.topLeftY &&
+						existingBounds.bottomRightX == diagonalBounds.bottomRightX &&
+						existingBounds.bottomRightY == diagonalBounds.bottomRightY)
+					{
+						// Copy cell values from diagonal pattern to existing map
+						for (uint32_t x = 0; x < width; x++)
+						{
+							for (uint32_t z = 0; z < height; z++)
+							{
+								bool diagonalValue = diagonalCellMap.GetValue(x, z);
+								existingCellMap.SetValue(x, z, diagonalValue);
+							}
+						}
+					}
+				}
+				
 				UpdateSelectedRegion(pThis);
 			}
 		}
@@ -151,6 +334,54 @@ namespace
 		ModifierKeyFlagAlt = 0x4,
 		ModifierKeyFlagAll = ModifierKeyFlagShift | ModifierKeyFlagControl | ModifierKeyFlagAlt,
 	};
+
+	bool __fastcall OnMouseWheelHook(
+		cSC4ViewInputControlDemolish* pThis,
+		void* edxUnused,
+		int32_t x,
+		int32_t z,
+		uint32_t modifiers,
+		int32_t wheelDelta)
+	{
+		// Check if we're in diagonal mode and Alt is held
+		if (diagonalMode && (modifiers & ModifierKeyFlagAlt))
+		{
+			// Adjust diagonal thickness based on wheel direction
+			int32_t oldThickness = diagonalThickness;
+			
+			if (wheelDelta > 0)
+			{
+				// Scroll up - increase thickness (max 5, skip 0)
+				if (diagonalThickness == -1) diagonalThickness = 1;
+				else diagonalThickness = (std::min)(diagonalThickness + 1, 5);
+			}
+			else if (wheelDelta < 0)
+			{
+				// Scroll down - decrease thickness (min -5, skip 0)
+				if (diagonalThickness == 1) diagonalThickness = -1;
+				else diagonalThickness = (std::max)(diagonalThickness - 1, -5);
+			}
+			
+			if (diagonalThickness != oldThickness)
+			{			
+				// Update preview if we have an active selection
+				if (pThis->bCellPicked && pThis->pCellRegion)
+				{
+					// Trigger preview update by calling SetOccupantFilterOption
+					SetOccupantFilterOption(pThis, occupantFilterType, diagonalMode);
+					
+					// Force immediate visual update of the preview
+					UpdateSelectedRegion(pThis);
+				}
+			}
+			
+			// Return true to indicate we handled the event (prevents zooming)
+			return true;
+		}
+		
+		// Let default behavior handle normal zoom
+		return false;
+	}
 
 	bool __fastcall OnKeyDownHook(
 		cSC4ViewInputControlDemolish* pThis,
@@ -172,25 +403,29 @@ namespace
 			}
 			else
 			{
-				// Because we currently only have 2 additional bulldoze modes we
-				// configure them using the B key with modifiers.
-				// This also avoids any issues with overriding other tool shortcuts.
+				// Configure bulldoze modes using the B key with modifiers.
+				// Alt acts as a diagonal modifier on top of the base modes.
 				if (vkCode == 'B')
 				{
 					handled = true;
 					const uint32_t activeModifiers = modifiers & ModifierKeyFlagAll;
+					const bool isDiagonal = (activeModifiers & ModifierKeyFlagAlt) == ModifierKeyFlagAlt;
 
 					if (activeModifiers == ModifierKeyFlagNone)
 					{
-						SetOccupantFilterOption(pThis, OccupantFilterType::None);
+						SetOccupantFilterOption(pThis, OccupantFilterType::None, false);
+					}
+					else if (activeModifiers == ModifierKeyFlagAlt)
+					{
+						SetOccupantFilterOption(pThis, OccupantFilterType::None, true);
 					}
 					else if ((activeModifiers & ModifierKeyFlagControl) == ModifierKeyFlagControl)
 					{
-						SetOccupantFilterOption(pThis, OccupantFilterType::Flora);
+						SetOccupantFilterOption(pThis, OccupantFilterType::Flora, isDiagonal);
 					}
 					else if ((activeModifiers & ModifierKeyFlagShift) == ModifierKeyFlagShift)
 					{
-						SetOccupantFilterOption(pThis, OccupantFilterType::Network);
+						SetOccupantFilterOption(pThis, OccupantFilterType::Network, isDiagonal);
 					}
 				}
 			}
@@ -202,14 +437,28 @@ namespace
 	void __fastcall Activate(cSC4ViewInputControlDemolish* pThis, void* edxUnused)
 	{
 		occupantFilterType = OccupantFilterType::None;
+		diagonalMode = false;
+		diagonalThickness = 1; // Reset thickness to default
+		currentViewControl = pThis;
 
 		switch (pThis->cursorIID)
 		{
 		case cSC4ViewInputControlDemolishHooks::BulldozeCursorFlora:
 			occupantFilterType = OccupantFilterType::Flora;
 			break;
+		case cSC4ViewInputControlDemolishHooks::BulldozeCursorFloraDiagonal:
+			occupantFilterType = OccupantFilterType::Flora;
+			diagonalMode = true;
+			break;
 		case cSC4ViewInputControlDemolishHooks::BulldozeCursorNetwork:
 			occupantFilterType = OccupantFilterType::Network;
+			break;
+		case cSC4ViewInputControlDemolishHooks::BulldozeCursorNetworkDiagonal:
+			occupantFilterType = OccupantFilterType::Network;
+			diagonalMode = true;
+			break;
+		case cSC4ViewInputControlDemolishHooks::BulldozeCursorDefaultDiagonal:
+			diagonalMode = true;
 			break;
 		}
 	}
@@ -270,6 +519,66 @@ namespace
 		long demolishEffectX,
 		long demolishEffectZ)
 	{
+		
+		// Apply diagonal modification if enabled and we have valid view control
+		if (diagonalMode && currentViewControl && currentViewControl->pCellRegion)
+		{
+			cSC4ViewInputControlDemolish* pViewControl = currentViewControl;
+			const auto& bounds = cellRegion.bounds;
+			
+			// Create diagonal region using reliable click coordinates
+			SC4CellRegion<int32_t> diagonalRegion = CreateDiagonalRegion(
+				bounds.topLeftX, bounds.topLeftY,
+				bounds.bottomRightX, bounds.bottomRightY,
+				pViewControl->clickX, pViewControl->clickZ
+			);
+			
+			// Update view control's cellMap contents without changing structure
+			auto& existingCellMap = pViewControl->pCellRegion->cellMap;
+			const auto& diagonalCellMap = diagonalRegion.cellMap;
+			
+			// Calculate dimensions from bounds
+			const auto& existingBounds = pViewControl->pCellRegion->bounds;
+			const auto& diagonalBounds = diagonalRegion.bounds;
+			
+			uint32_t width = static_cast<uint32_t>(bounds.bottomRightX - bounds.topLeftX + 1);
+			uint32_t height = static_cast<uint32_t>(bounds.bottomRightY - bounds.topLeftY + 1);
+			
+			// Verify bounds match and update cellMap safely
+			if (existingBounds.topLeftX == diagonalBounds.topLeftX &&
+				existingBounds.topLeftY == diagonalBounds.topLeftY &&
+				existingBounds.bottomRightX == diagonalBounds.bottomRightX &&
+				existingBounds.bottomRightY == diagonalBounds.bottomRightY)
+			{
+				// Copy diagonal pattern into existing cellMap
+				for (uint32_t x = 0; x < width; x++)
+				{
+					for (uint32_t z = 0; z < height; z++)
+					{
+						bool diagonalValue = diagonalCellMap.GetValue(x, z);
+						existingCellMap.SetValue(x, z, diagonalValue);
+					}
+				}
+			}
+			
+			// Call demolish with diagonal region for preview calculation
+			bool result = DemolishRegion(
+				pDemolition,
+				false, // demolish
+				diagonalRegion,
+				1, // privilegeType
+				flags,
+				clearZonedArea,
+				totalCost,
+				demolishedOccupantSet,
+				pDemolishEffectOccupant,
+				demolishEffectX,
+				demolishEffectZ);
+			
+			return result;
+		}
+
+		// Normal rectangular bulldoze preview
 		return DemolishRegion(
 			pDemolition,
 			false, // demolish
@@ -298,6 +607,36 @@ namespace
 		long demolishEffectX,
 		long demolishEffectZ)
 	{
+		
+		// Apply diagonal modification if enabled
+		if (diagonalMode)
+		{
+			const auto& bounds = cellRegion.bounds;
+			
+			// Create diagonal region using reliable click coordinates
+			SC4CellRegion<int32_t> diagonalRegion = CreateDiagonalRegion(
+				bounds.topLeftX, bounds.topLeftY,
+				bounds.bottomRightX, bounds.bottomRightY,
+				currentViewControl ? currentViewControl->clickX : -1,
+				currentViewControl ? currentViewControl->clickZ : -1
+			);
+			
+			return DemolishRegion(
+				pDemolition,
+				true, // demolish
+				diagonalRegion,
+				1, // privilegeType
+				flags,
+				clearZonedArea,
+				totalCost,
+				demolishedOccupantSet,
+				pDemolishEffectOccupant,
+				demolishEffectX,
+				demolishEffectZ);
+		}
+
+		// Normal rectangular bulldoze execution
+
 		return DemolishRegion(
 			pDemolition,
 			true, // demolish
@@ -371,6 +710,7 @@ bool cSC4ViewInputControlDemolishHooks::Install()
 		try
 		{
 			Patcher::InstallJumpTableHook(0xa901d8, reinterpret_cast<uintptr_t>(&OnKeyDownHook));
+			Patcher::InstallJumpTableHook(0xa901f4, reinterpret_cast<uintptr_t>(&OnMouseWheelHook));
 			Patcher::InstallJumpTableHook(0xa901fc, reinterpret_cast<uintptr_t>(&Activate));
 			InstallUpdateSelectedRegionDemolishRegionHook();
 			InstallOnMouseUpLDemolishRegionHook();
