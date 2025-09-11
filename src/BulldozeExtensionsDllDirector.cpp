@@ -223,6 +223,7 @@ private:
 			break;
 		case BulldozeNetworkDiagonalShortcutID:
 			ActivateBulldozeTool(cSC4ViewInputControlDemolishHooks::BulldozeCursorNetworkDiagonal);
+			break;
 		}
 
 		return true;
