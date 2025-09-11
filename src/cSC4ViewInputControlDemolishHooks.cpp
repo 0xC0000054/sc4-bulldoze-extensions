@@ -110,7 +110,7 @@ namespace
 	static OccupantFilterType occupantFilterType = OccupantFilterType::None;
 	static bool diagonalMode = false;
 	static int32_t diagonalThickness = 1; // Default thickness is 1 (single line)
-	static int32_t maxDiagonalThickness = 9;
+	static constexpr int32_t kMaxDiagonalThickness = 9;
 	static cSC4ViewInputControlDemolish* currentViewControl = nullptr;
 
 
@@ -185,11 +185,14 @@ namespace
 			// Set the current cell and perpendicular cells for thickness
 			// Handle positive/negative thickness values (skip 0)
 			int32_t startOffset, endOffset;
-			if (diagonalThickness > 0) {
+
+			if (diagonalThickness > 0)
+			{
 				startOffset = 0;
 				endOffset = diagonalThickness - 1;
 			}
-			else {
+			else
+			{
 				startOffset = diagonalThickness + 1;
 				endOffset = 0;
 			}
@@ -198,11 +201,15 @@ namespace
 			{
 				// Calculate perpendicular offset based on line direction
 				int32_t perpX, perpZ;
-				if (abs(dx) > abs(dz)) {
+
+				if (abs(dx) > abs(dz))
+				{
 					// More horizontal line - add thickness vertically
 					perpX = currentX;
 					perpZ = currentZ + thickOffset;
-				} else {
+				}
+				else
+				{
 					// More vertical line - add thickness horizontally
 					perpX = currentX + thickOffset;
 					perpZ = currentZ;
@@ -210,6 +217,7 @@ namespace
 
 				int32_t cellX = perpX - minX;
 				int32_t cellZ = perpZ - minZ;
+
 				if (cellX >= 0 && cellX < (maxX - minX + 1) && cellZ >= 0 && cellZ < (maxZ - minZ + 1))
 				{
 					region.cellMap.SetValue(cellX, cellZ, true);
@@ -217,9 +225,13 @@ namespace
 				}
 			}
 
-			if (currentX == diagEndX && currentZ == diagEndZ) break;
+			if (currentX == diagEndX && currentZ == diagEndZ)
+			{
+				break;
+			}
 
 			int32_t e2 = 2 * err;
+
 			if (e2 > -dz)
 			{
 				err -= dz;
@@ -286,9 +298,12 @@ namespace
 
 					// Create diagonal region using reliable click coordinates
 					SC4CellRegion<int32_t> diagonalRegion = CreateDiagonalRegion(
-						bounds.topLeftX, bounds.topLeftY,
-						bounds.bottomRightX, bounds.bottomRightY,
-						pThis->clickX, pThis->clickZ
+						bounds.topLeftX,
+						bounds.topLeftY,
+						bounds.bottomRightX,
+						bounds.bottomRightY,
+						pThis->clickX,
+						pThis->clickZ
 					);
 
 					// Only modify the cellMap contents, not the structure
@@ -352,14 +367,26 @@ namespace
 			if (wheelDelta > 0)
 			{
 				// Scroll up - increase thickness (skip 0)
-				if (diagonalThickness == -1) diagonalThickness = 1;
-				else diagonalThickness = (std::min)(diagonalThickness + 1, maxDiagonalThickness);
+				if (diagonalThickness == -1)
+				{
+					diagonalThickness = 1;
+				}
+				else
+				{
+					diagonalThickness = (std::min)(diagonalThickness + 1, kMaxDiagonalThickness);
+				}
 			}
 			else if (wheelDelta < 0)
 			{
 				// Scroll down - decrease thickness (skip 0)
-				if (diagonalThickness == 1) diagonalThickness = -1;
-				else diagonalThickness = (std::max)(diagonalThickness - 1, -maxDiagonalThickness);
+				if (diagonalThickness == 1)
+				{
+					diagonalThickness = -1;
+				}
+				else
+				{
+					diagonalThickness = (std::max)(diagonalThickness - 1, -kMaxDiagonalThickness);
+				}
 			}
 
 			if (diagonalThickness != oldThickness)
@@ -411,21 +438,17 @@ namespace
 					const uint32_t activeModifiers = modifiers & ModifierKeyFlagAll;
 					const bool isDiagonal = (activeModifiers & ModifierKeyFlagAlt) == ModifierKeyFlagAlt;
 
-					if (activeModifiers == ModifierKeyFlagNone)
-					{
-						SetOccupantFilterOption(pThis, OccupantFilterType::None, false);
-					}
-					else if (activeModifiers == ModifierKeyFlagAlt)
-					{
-						SetOccupantFilterOption(pThis, OccupantFilterType::None, true);
-					}
-					else if ((activeModifiers & ModifierKeyFlagControl) == ModifierKeyFlagControl)
+					if ((activeModifiers & ModifierKeyFlagControl) == ModifierKeyFlagControl)
 					{
 						SetOccupantFilterOption(pThis, OccupantFilterType::Flora, isDiagonal);
 					}
 					else if ((activeModifiers & ModifierKeyFlagShift) == ModifierKeyFlagShift)
 					{
 						SetOccupantFilterOption(pThis, OccupantFilterType::Network, isDiagonal);
+					}
+					else
+					{
+						SetOccupantFilterOption(pThis, OccupantFilterType::None, isDiagonal);
 					}
 				}
 			}
@@ -560,9 +583,12 @@ namespace
 
 			// Create diagonal region using reliable click coordinates
 			SC4CellRegion<int32_t> diagonalRegion = CreateDiagonalRegion(
-				bounds.topLeftX, bounds.topLeftY,
-				bounds.bottomRightX, bounds.bottomRightY,
-				pViewControl->clickX, pViewControl->clickZ
+				bounds.topLeftX,
+				bounds.topLeftY,
+				bounds.bottomRightX,
+				bounds.bottomRightY,
+				pViewControl->clickX,
+				pViewControl->clickZ
 			);
 
 			// Update view control's cellMap contents without changing structure
@@ -647,8 +673,10 @@ namespace
 
 			// Create diagonal region using reliable click coordinates
 			SC4CellRegion<int32_t> diagonalRegion = CreateDiagonalRegion(
-				bounds.topLeftX, bounds.topLeftY,
-				bounds.bottomRightX, bounds.bottomRightY,
+				bounds.topLeftX,
+				bounds.topLeftY,
+				bounds.bottomRightX,
+				bounds.bottomRightY,
 				currentViewControl ? currentViewControl->clickX : -1,
 				currentViewControl ? currentViewControl->clickZ : -1
 			);
