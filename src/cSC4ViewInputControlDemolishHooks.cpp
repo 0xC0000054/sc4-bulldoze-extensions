@@ -128,14 +128,14 @@ namespace
 
 		// Determine diagonal direction based on click position relative to bounding box
 		int32_t diagStartX, diagStartZ, diagEndX, diagEndZ;
-		
+
 		if (startX != -1 && startZ != -1)
 		{
 			// Use the reliable click coordinates to determine diagonal direction
 			// Simply draw from the click point to the opposite corner
 			int32_t centerX = (minX + maxX) / 2;
 			int32_t centerZ = (minZ + maxZ) / 2;
-			
+
 			if (startX <= centerX && startZ <= centerZ)
 			{
 				// Click in northwest area -> draw NW to SE
@@ -193,7 +193,7 @@ namespace
 				startOffset = diagonalThickness + 1;
 				endOffset = 0;
 			}
-			
+
 			for (int32_t thickOffset = startOffset; thickOffset <= endOffset; thickOffset++)
 			{
 				// Calculate perpendicular offset based on line direction
@@ -203,11 +203,11 @@ namespace
 					perpX = currentX;
 					perpZ = currentZ + thickOffset;
 				} else {
-					// More vertical line - add thickness horizontally  
+					// More vertical line - add thickness horizontally
 					perpX = currentX + thickOffset;
 					perpZ = currentZ;
 				}
-				
+
 				int32_t cellX = perpX - minX;
 				int32_t cellZ = perpZ - minZ;
 				if (cellX >= 0 && cellX < (maxX - minX + 1) && cellZ >= 0 && cellZ < (maxZ - minZ + 1))
@@ -249,7 +249,7 @@ namespace
 	{
 		// Always store the current view control for use in other hooks
 		currentViewControl = pThis;
-		
+
 		if (occupantFilterType != type || diagonalMode != diagonal)
 		{
 			occupantFilterType = type;
@@ -259,19 +259,19 @@ namespace
 			switch (occupantFilterType)
 			{
 			case OccupantFilterType::Flora:
-				pThis->SetCursor(diagonalMode ? 
-					cSC4ViewInputControlDemolishHooks::BulldozeCursorFloraDiagonal : 
+				pThis->SetCursor(diagonalMode ?
+					cSC4ViewInputControlDemolishHooks::BulldozeCursorFloraDiagonal :
 					cSC4ViewInputControlDemolishHooks::BulldozeCursorFlora);
 				break;
 			case OccupantFilterType::Network:
-				pThis->SetCursor(diagonalMode ? 
-					cSC4ViewInputControlDemolishHooks::BulldozeCursorNetworkDiagonal : 
+				pThis->SetCursor(diagonalMode ?
+					cSC4ViewInputControlDemolishHooks::BulldozeCursorNetworkDiagonal :
 					cSC4ViewInputControlDemolishHooks::BulldozeCursorNetwork);
 				break;
 			case OccupantFilterType::None:
 			default:
-				pThis->SetCursor(diagonalMode ? 
-					cSC4ViewInputControlDemolishHooks::BulldozeCursorDefaultDiagonal : 
+				pThis->SetCursor(diagonalMode ?
+					cSC4ViewInputControlDemolishHooks::BulldozeCursorDefaultDiagonal :
 					cSC4ViewInputControlDemolishHooks::BulldozeCursorDefault);
 				break;
 			}
@@ -290,19 +290,19 @@ namespace
 						bounds.bottomRightX, bounds.bottomRightY,
 						pThis->clickX, pThis->clickZ
 					);
-					
+
 					// Only modify the cellMap contents, not the structure
 					// Copy diagonal pattern into existing cellMap without changing pointers
 					auto& existingCellMap = pThis->pCellRegion->cellMap;
 					const auto& diagonalCellMap = diagonalRegion.cellMap;
-					
+
 					// Calculate dimensions from bounds (both regions should have same bounds)
 					const auto& existingBounds = pThis->pCellRegion->bounds;
 					const auto& diagonalBounds = diagonalRegion.bounds;
-					
+
 					uint32_t width = static_cast<uint32_t>(bounds.bottomRightX - bounds.topLeftX + 1);
 					uint32_t height = static_cast<uint32_t>(bounds.bottomRightY - bounds.topLeftY + 1);
-					
+
 					// Verify bounds match before copying
 					if (existingBounds.topLeftX == diagonalBounds.topLeftX &&
 						existingBounds.topLeftY == diagonalBounds.topLeftY &&
@@ -320,7 +320,7 @@ namespace
 						}
 					}
 				}
-				
+
 				UpdateSelectedRegion(pThis);
 			}
 		}
@@ -348,7 +348,7 @@ namespace
 		{
 			// Adjust diagonal thickness based on wheel direction
 			int32_t oldThickness = diagonalThickness;
-			
+
 			if (wheelDelta > 0)
 			{
 				// Scroll up - increase thickness (skip 0)
@@ -361,24 +361,24 @@ namespace
 				if (diagonalThickness == 1) diagonalThickness = -1;
 				else diagonalThickness = (std::max)(diagonalThickness - 1, -maxDiagonalThickness);
 			}
-			
+
 			if (diagonalThickness != oldThickness)
-			{			
+			{
 				// Update preview if we have an active selection
 				if (pThis->bCellPicked && pThis->pCellRegion)
 				{
 					// Trigger preview update by calling SetOccupantFilterOption
 					SetOccupantFilterOption(pThis, occupantFilterType, diagonalMode);
-					
+
 					// Force immediate visual update of the preview
 					UpdateSelectedRegion(pThis);
 				}
 			}
-			
+
 			// Return true to indicate we handled the event (prevents zooming)
 			return true;
 		}
-		
+
 		// Let default behavior handle normal zoom
 		return false;
 	}
@@ -525,9 +525,9 @@ namespace
 			float floraColor[4] = { 0.38f, 0.69f, 0.38f, 0.5f };   // Green for flora/nature
 			float networkColor[4] = { 0.98f, 0.60f, 0.20f, 0.5f }; // Orange for networks/infrastructure
 			float normalColor[4] = { 0.30f, 0.60f, 0.85f, 0.5f };   // Blue for standard
-			
+
 			float* colorToUse = nullptr;
-			
+
 			switch (occupantFilterType)
 			{
 			case OccupantFilterType::Flora:
@@ -541,7 +541,7 @@ namespace
 				colorToUse = normalColor;
 				break;
 			}
-			
+
 			if (colorToUse != nullptr)
 			{
 				S3DColorFloat* previewColor = &(currentViewControl->demolishOK);
@@ -551,31 +551,31 @@ namespace
 				previewColor->a = colorToUse[3];
 			}
 		}
-		
+
 		// Apply diagonal modification if enabled and we have valid view control
 		if (diagonalMode && currentViewControl && currentViewControl->pCellRegion)
 		{
 			cSC4ViewInputControlDemolish* pViewControl = currentViewControl;
 			const auto& bounds = cellRegion.bounds;
-			
+
 			// Create diagonal region using reliable click coordinates
 			SC4CellRegion<int32_t> diagonalRegion = CreateDiagonalRegion(
 				bounds.topLeftX, bounds.topLeftY,
 				bounds.bottomRightX, bounds.bottomRightY,
 				pViewControl->clickX, pViewControl->clickZ
 			);
-			
+
 			// Update view control's cellMap contents without changing structure
 			auto& existingCellMap = pViewControl->pCellRegion->cellMap;
 			const auto& diagonalCellMap = diagonalRegion.cellMap;
-			
+
 			// Calculate dimensions from bounds
 			const auto& existingBounds = pViewControl->pCellRegion->bounds;
 			const auto& diagonalBounds = diagonalRegion.bounds;
-			
+
 			uint32_t width = static_cast<uint32_t>(bounds.bottomRightX - bounds.topLeftX + 1);
 			uint32_t height = static_cast<uint32_t>(bounds.bottomRightY - bounds.topLeftY + 1);
-			
+
 			// Verify bounds match and update cellMap safely
 			if (existingBounds.topLeftX == diagonalBounds.topLeftX &&
 				existingBounds.topLeftY == diagonalBounds.topLeftY &&
@@ -592,7 +592,7 @@ namespace
 					}
 				}
 			}
-			
+
 			// Call demolish with diagonal region for preview calculation
 			bool result = DemolishRegion(
 				pDemolition,
@@ -606,7 +606,7 @@ namespace
 				pDemolishEffectOccupant,
 				demolishEffectX,
 				demolishEffectZ);
-			
+
 			return result;
 		}
 
@@ -639,12 +639,12 @@ namespace
 		long demolishEffectX,
 		long demolishEffectZ)
 	{
-		
+
 		// Apply diagonal modification if enabled
 		if (diagonalMode)
 		{
 			const auto& bounds = cellRegion.bounds;
-			
+
 			// Create diagonal region using reliable click coordinates
 			SC4CellRegion<int32_t> diagonalRegion = CreateDiagonalRegion(
 				bounds.topLeftX, bounds.topLeftY,
@@ -652,7 +652,7 @@ namespace
 				currentViewControl ? currentViewControl->clickX : -1,
 				currentViewControl ? currentViewControl->clickZ : -1
 			);
-			
+
 			return DemolishRegion(
 				pDemolition,
 				true, // demolish
