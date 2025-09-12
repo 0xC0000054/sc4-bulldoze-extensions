@@ -16,6 +16,21 @@ When the flora bulldoze mode is active, the bulldoze tool will only affect objec
 This mode is activated in the city view using a _Shift + B_ shortcut, this can be done with or without the bulldoze tool active.
 When the network bulldoze mode is active, the bulldoze tool will only affect transportation networks (excluding power lines and water pipes).
 
+## Configuration Options
+
+### Bulldoze Extensions Tuning Exemplar
+
+This exemplar defines the following properties to control the highlight color used for the demolished area.
+All 3 properties consist of 4 Float32 values that define the colors in RGBA order.
+Converting a color channel to/from float can be done by dividing/multiplying the value be 255, note that the resulting value may be +/- 1 due to rounding.
+
+SC4 default green highlight is RGBA Float 0.0, 0.7, 0.2, 0.3 (RGBA 0, 179, 51, 77).
+
+| Property Name | Property ID | Description |
+|---------------|-------------|-------------|
+| Bulldoze Extensions Normal Highlight Color | 0x8FD94ED0 | The highlight color used when not in the flora or network modes. Defaults to blue (RGBA 77, 153, 217, 128). |
+| Bulldoze Extensions Flora Highlight Color | 0x8FD94ED0 | The highlight color used when not in the flora mode. Defaults to green (RGBA 97, 176, 97, 128). |
+| Bulldoze Extensions Network Highlight Color | 0x8FD94ED0 | The highlight color used when not in the flora or network modes. Defaults to orange (RGBA 250, 153, 51, 128). |
 
 ## System Requirements
 

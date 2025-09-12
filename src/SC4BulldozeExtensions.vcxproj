@@ -29,6 +29,7 @@
     <ClCompile Include="..\vendor\gzcom-dll\src\cS3DVector3.cpp" />
     <ClCompile Include="..\vendor\gzcom-dll\src\cSC4BaseOccupantFilter.cpp" />
     <ClCompile Include="..\vendor\gzcom-dll\src\EASTLAllocatorSC4.cpp" />
+    <ClCompile Include="BulldozeHighlightColors.cpp" />
     <ClCompile Include="cSC4ViewInputControlDemolishHooks.cpp" />
     <ClCompile Include="DebugUtil.cpp" />
     <ClCompile Include="BulldozeExtensionsDllDirector.cpp" />
@@ -37,6 +38,7 @@
     <ClCompile Include="Logger.cpp" />
     <ClCompile Include="NetworkOccupantFilter.cpp" />
     <ClCompile Include="Patcher.cpp" />
+    <ClCompile Include="S3DColorFloat.cpp" />
     <ClCompile Include="SC4VersionDetection.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -47,13 +49,16 @@
     <ClInclude Include="..\vendor\gzcom-dll\include\cRZBaseUnknown.h" />
     <ClInclude Include="..\vendor\gzcom-dll\include\cRZCOMDllDirector.h" />
     <ClInclude Include="..\vendor\gzcom-dll\include\cSC4BaseOccupantFilter.h" />
+    <ClInclude Include="BulldozeHighlightColors.h" />
     <ClInclude Include="cSC4ViewInputControlDemolishHooks.h" />
     <ClInclude Include="DebugUtil.h" />
     <ClInclude Include="FileSystem.h" />
     <ClInclude Include="FloraOccupantFilter.h" />
+    <ClInclude Include="IBulldozeHighlightColors.h" />
     <ClInclude Include="Logger.h" />
     <ClInclude Include="NetworkOccupantFilter.h" />
     <ClInclude Include="Patcher.h" />
+    <ClInclude Include="S3DColorFloat.h" />
     <ClInclude Include="SC4VersionDetection.h" />
     <ClInclude Include="version.h" />
   </ItemGroup>

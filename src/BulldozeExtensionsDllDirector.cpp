@@ -20,6 +20,7 @@
  */
 
 #include "version.h"
+#include "BulldozeHighlightColors.h"
 #include "cGZPersistResourceKey.h"
 #include "cSC4ViewInputControlDemolishHooks.h"
 #include "FileSystem.h"
@@ -55,13 +56,16 @@ static constexpr uint32_t BulldozeFloraDiagonalShortcutID = 0x755C6E41;
 static constexpr uint32_t BulldozeNetworkShortcutID = 0x5ECED6AE;
 static constexpr uint32_t BulldozeNetworkDiagonalShortcutID = 0x5ECED6AF;
 
+IBulldozeHighlightColors* spBulldozeHighlightColors = nullptr;
 
 class BulldozeExtensionsDllDirector final : public cRZMessage2COMDirector
 {
 public:
 	BulldozeExtensionsDllDirector()
-		: pView3D(nullptr)
+		: bulldozeHighlightColors(), pView3D(nullptr)
 	{
+		spBulldozeHighlightColors = &bulldozeHighlightColors;
+
 		Logger& logger = Logger::GetInstance();
 		logger.Init(FileSystem::GetLogFilePath(), LogLevel::Info);
 		logger.WriteLogFileHeader("SC4BulldozeExtensions v" PLUGIN_VERSION_STR);
@@ -181,11 +185,13 @@ private:
 				}
 			}
 		}
+		bulldozeHighlightColors.Init();
 	}
 
 	void PreCityShutdown()
 	{
 		UnregisterBulldozeShortcutNotifications();
+		bulldozeHighlightColors.Shutdown();
 
 		cISC4View3DWin* localView3D = pView3D;
 		pView3D = nullptr;
@@ -257,6 +263,7 @@ private:
 	}
 
 	cISC4View3DWin* pView3D;
+	BulldozeHighlightColors bulldozeHighlightColors;
 };
 
 cRZCOMDllDirector* RZGetCOMDllDirector() {

@@ -26,6 +26,7 @@
 #include "cRZAutoRefCount.h"
 #include "FloraOccupantFilter.h"
 #include "GZServPtrs.h"
+#include "IBulldozeHighlightColors.h"
 #include "Logger.h"
 #include "NetworkOccupantFilter.h"
 #include "Patcher.h"
@@ -40,14 +41,6 @@
 
 namespace
 {
-	struct S3DColorFloat
-	{
-		float r;
-		float g;
-		float b;
-		float a;
-	};
-
 	struct cSC4ViewInputControlDemolish : public cISC4ViewInputControl
 	{
 		uint8_t bInitialized;
@@ -255,7 +248,6 @@ namespace
 
 	static const cSC4ViewInputControlDemolish_ThiscallFn EndInput = reinterpret_cast<cSC4ViewInputControlDemolish_ThiscallFn>(0x4b9040);
 	static const cSC4ViewInputControlDemolish_ThiscallFn UpdateSelectedRegion = reinterpret_cast<cSC4ViewInputControlDemolish_ThiscallFn>(0x4b93b0);
-
 
 	void SetOccupantFilterOption(cSC4ViewInputControlDemolish* pThis, OccupantFilterType type, bool diagonal)
 	{
@@ -543,36 +535,21 @@ namespace
 		long demolishEffectZ)
 	{
 		// Set preview colors based on bulldoze mode
-		if (currentViewControl)
+		if (currentViewControl && spBulldozeHighlightColors)
 		{
-			float floraColor[4] = { 0.38f, 0.69f, 0.38f, 0.5f };   // Green for flora/nature
-			float networkColor[4] = { 0.98f, 0.60f, 0.20f, 0.5f }; // Orange for networks/infrastructure
-			float normalColor[4] = { 0.30f, 0.60f, 0.85f, 0.5f };   // Blue for standard
-
-			float* colorToUse = nullptr;
+			auto type = IBulldozeHighlightColors::ColorType::Normal;
 
 			switch (occupantFilterType)
 			{
 			case OccupantFilterType::Flora:
-				colorToUse = floraColor;
+				type = IBulldozeHighlightColors::ColorType::Flora;
 				break;
 			case OccupantFilterType::Network:
-				colorToUse = networkColor;
-				break;
-			case OccupantFilterType::None:
-			default:
-				colorToUse = normalColor;
+				type = IBulldozeHighlightColors::ColorType::Network;
 				break;
 			}
 
-			if (colorToUse != nullptr)
-			{
-				S3DColorFloat* previewColor = &(currentViewControl->demolishOK);
-				previewColor->r = colorToUse[0];
-				previewColor->g = colorToUse[1];
-				previewColor->b = colorToUse[2];
-				previewColor->a = colorToUse[3];
-			}
+			currentViewControl->demolishOK = spBulldozeHighlightColors->GetDemolishOKColor(type);
 		}
 
 		// Apply diagonal modification if enabled and we have valid view control

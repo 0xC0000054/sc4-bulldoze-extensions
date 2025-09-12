@@ -105,6 +105,12 @@
     <ClCompile Include="..\vendor\gzcom-dll\src\cRZCellMap.cpp">
       <Filter>Source Files\GZCOM</Filter>
     </ClCompile>
+    <ClCompile Include="BulldozeHighlightColors.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="S3DColorFloat.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Logger.h">
@@ -153,6 +159,15 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="version.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="BulldozeHighlightColors.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="S3DColorFloat.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="IBulldozeHighlightColors.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
