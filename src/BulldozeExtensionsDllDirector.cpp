@@ -84,7 +84,7 @@ private:
 			{
 				cRZAutoRefCount<cISC4ViewInputControl> pControl = cSC4ViewInputControlDemolishHooks::CreateViewInputControl(cursorID);
 
-				pView3D->SetCurrentViewInputControl(pControl, cISC4View3DWin::ViewInputControlStackOperation::RemoveAllControls);
+				pView3D->SetCurrentViewInputControl(pControl, cISC4View3DWin::ViewInputControlStackOperation_RemoveAllControls);
 			}
 		}
 	}
