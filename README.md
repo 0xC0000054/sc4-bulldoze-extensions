@@ -16,6 +16,16 @@ When the flora bulldoze mode is active, the bulldoze tool will only affect objec
 This mode is activated in the city view using a _Shift + B_ shortcut, this can be done with or without the bulldoze tool active.
 When the network bulldoze mode is active, the bulldoze tool will only affect transportation networks (excluding power lines and water pipes).
 
+### Diagonal Bulldoze Modes
+
+These 3 modes are activated by Alt keyboard combinations. 
+
+* _Alt + B_ for a diagonal version of the default bulldoze tool.
+* _Control + Alt + B_ for a diagonal version of the flora bulldoze tool.
+* _Shift + Alt + B_ for a diagonal version of the network bulldoze tool.
+
+The size of the diagonal area can be changed by holding down the _Alt_ key and using the mouse scroll wheel to adjust the size.
+
 ## Configuration Options
 
 ### Bulldoze Extensions Tuning Exemplar
