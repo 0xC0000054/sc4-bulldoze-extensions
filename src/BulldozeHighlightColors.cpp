@@ -66,53 +66,43 @@ namespace
 		}
 	}
 
-	namespace details
+	S3DColorFloat GetDefaultDemolishOKColor()
 	{
-		static S3DColorFloat DetermineDemolishOKColor()
+		// The default green 'Demolish OK' color SC4 uses (RGBA 0, 179, 51, 77).
+
+		S3DColorFloat color(0.0F, 0.7F, 0.2F, 0.3F);
+
+		cIGZPersistResourceManagerPtr pRM;
+
+		if (pRM)
 		{
-			// The default green 'Demolish OK' color SC4 uses (RGBA 0, 179, 51, 77).
+			// The 'Demolish OK' and 'Demolish Not OK' colors can be overridden using
+			// undocumented properties in the 'Model highlight properties' exemplar.
+			// 'Demolish OK' uses property id 0xea639fba and 'Demolish Not OK' uses
+			// property id id0xea639fbb.
 
-			S3DColorFloat color(0.0F, 0.7F, 0.2F, 0.3F);
+			const cGZPersistResourceKey modelHighlightExemplarKey(0x6534284A, 0x690F693F, 0x4A639EF2);
 
-			cIGZPersistResourceManagerPtr pRM;
+			cRZAutoRefCount<cISCResExemplar> pExemplar;
 
-			if (pRM)
+			if (pRM->GetResource(
+				modelHighlightExemplarKey,
+				GZIID_cISCResExemplar,
+				pExemplar.AsPPVoid(),
+				0,
+				nullptr))
 			{
-				// The 'Demolish OK' and 'Demolish Not OK' colors can be overridden using
-				// undocumented properties in the 'Model highlight properties' exemplar.
-				// 'Demolish OK' uses property id 0xea639fba and 'Demolish Not OK' uses
-				// property id id0xea639fbb.
+				constexpr uint32_t kDemolishOKPropertyID = 0xEA639FBA;
 
-				const cGZPersistResourceKey modelHighlightExemplarKey(0x6534284A, 0x690F693F, 0x4A639EF2);
-
-				cRZAutoRefCount<cISCResExemplar> pExemplar;
-
-				if (pRM->GetResource(
-					modelHighlightExemplarKey,
-					GZIID_cISCResExemplar,
-					pExemplar.AsPPVoid(),
-					0,
-					nullptr))
-				{
-					constexpr uint32_t kDemolishOKPropertyID = 0xEA639FBA;
-
-					SetColorFromProperty(
-						pExemplar->AsISCPropertyHolder(),
-						kDemolishOKPropertyID,
-						color,
-						false);
-				}
+				SetColorFromProperty(
+					pExemplar->AsISCPropertyHolder(),
+					kDemolishOKPropertyID,
+					color,
+					false);
 			}
-
-			return color;
 		}
-	}
 
-	const S3DColorFloat& GetDefaultDemolishOKColor()
-	{
-		static const S3DColorFloat defaultColor = details::DetermineDemolishOKColor();
-
-		return defaultColor;
+		return color;
 	}
 }
 
@@ -124,6 +114,7 @@ BulldozeHighlightColors::BulldozeHighlightColors()
 	: normalBulldozeColor(),
 	  floraBulldozeHighlightColor(),
 	  networkBulldozeHighlightColor(),
+	  gameDefaultDemolishOKColor(),
 	  initialized(false)
 {
 }
@@ -134,12 +125,11 @@ void BulldozeHighlightColors::Init()
 	{
 		initialized = true;
 
-		const S3DColorFloat& defaultColor = GetDefaultDemolishOKColor();
+		gameDefaultDemolishOKColor = GetDefaultDemolishOKColor();
+		normalBulldozeColor = gameDefaultDemolishOKColor;
+		floraBulldozeHighlightColor = gameDefaultDemolishOKColor;
+		networkBulldozeHighlightColor = gameDefaultDemolishOKColor;
 
-		normalBulldozeColor = defaultColor;
-		floraBulldozeHighlightColor = defaultColor;
-		networkBulldozeHighlightColor = defaultColor;
-		
 		cIGZPersistResourceManagerPtr pRM;
 
 		if (pRM)
@@ -196,6 +186,6 @@ const S3DColorFloat& BulldozeHighlightColors::GetDemolishOKColor(ColorType type)
 			LogLevel::Error,
 			"Unsupported HighlightColorType value %d. Using the default color.",
 			static_cast<int32_t>(type));
-		return GetDefaultDemolishOKColor();
+		return gameDefaultDemolishOKColor;
 	}
 }

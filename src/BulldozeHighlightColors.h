@@ -37,6 +37,7 @@ private:
 	S3DColorFloat normalBulldozeColor;
 	S3DColorFloat floraBulldozeHighlightColor;
 	S3DColorFloat networkBulldozeHighlightColor;
+	S3DColorFloat gameDefaultDemolishOKColor;
 	bool initialized;
 };
 
