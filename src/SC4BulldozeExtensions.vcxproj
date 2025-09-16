@@ -23,6 +23,7 @@
     <ClCompile Include="cSC4ViewInputControlDemolishHooks.cpp" />
     <ClCompile Include="DebugUtil.cpp" />
     <ClCompile Include="BulldozeExtensionsDllDirector.cpp" />
+    <ClCompile Include="DezoneKeepNetworksOccupantFilter.cpp" />
     <ClCompile Include="FileSystem.cpp" />
     <ClCompile Include="FloraOccupantFilter.cpp" />
     <ClCompile Include="KeepNetworksOccupantFilter.cpp" />
@@ -44,8 +45,10 @@
     <ClInclude Include="BulldozeHighlightColors.h" />
     <ClInclude Include="cSC4ViewInputControlDemolishHooks.h" />
     <ClInclude Include="DebugUtil.h" />
+    <ClInclude Include="DezoneKeepNetworksOccupantFilter.h" />
     <ClInclude Include="FileSystem.h" />
     <ClInclude Include="FloraOccupantFilter.h" />
+    <ClInclude Include="GlobalCityPointers.h" />
     <ClInclude Include="IBulldozeHighlightColors.h" />
     <ClInclude Include="KeepNetworksOccupantFilter.h" />
     <ClInclude Include="Logger.h" />

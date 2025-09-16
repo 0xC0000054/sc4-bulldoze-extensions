@@ -24,6 +24,7 @@
 #include "cGZPersistResourceKey.h"
 #include "cSC4ViewInputControlDemolishHooks.h"
 #include "FileSystem.h"
+#include "GlobalCityPointers.h"
 #include "Logger.h"
 #include "cIGZApp.h"
 #include "cIGZCheatCodeManager.h"
@@ -55,8 +56,10 @@ static constexpr uint32_t BulldozeFloraShortcutID = 0x755C6E40;
 static constexpr uint32_t BulldozeFloraDiagonalShortcutID = 0x755C6E41;
 static constexpr uint32_t BulldozeNetworkShortcutID = 0x5ECED6AE;
 static constexpr uint32_t BulldozeNetworkDiagonalShortcutID = 0x5ECED6AF;
+static constexpr uint32_t DezoneKeepNetworksShortcutID = 0x0AFB2546;
 
 IBulldozeHighlightColors* spBulldozeHighlightColors = nullptr;
+cISC4LotManager* spLotManager = nullptr;
 
 class BulldozeExtensionsDllDirector final : public cRZMessage2COMDirector
 {
@@ -113,6 +116,7 @@ private:
 					ms2.AddNotification(this, BulldozeFloraDiagonalShortcutID);
 					ms2.AddNotification(this, BulldozeNetworkShortcutID);
 					ms2.AddNotification(this, BulldozeNetworkDiagonalShortcutID);
+					ms2.AddNotification(this, DezoneKeepNetworksShortcutID);
 				}
 			}
 		}
@@ -129,6 +133,7 @@ private:
 			pMS2->RemoveNotification(this, BulldozeFloraDiagonalShortcutID);
 			pMS2->RemoveNotification(this, BulldozeNetworkShortcutID);
 			pMS2->RemoveNotification(this, BulldozeNetworkDiagonalShortcutID);
+			pMS2->RemoveNotification(this, DezoneKeepNetworksShortcutID);
 		}
 	}
 
@@ -172,6 +177,8 @@ private:
 
 						if (pCity)
 						{
+							spLotManager = pCity->GetLotManager();
+
 							if (pCity->GetEstablished())
 							{
 								RegisterBulldozeShortcuts(*pMS2);
@@ -192,6 +199,7 @@ private:
 	{
 		UnregisterBulldozeShortcutNotifications();
 		bulldozeHighlightColors.Shutdown();
+		spLotManager = nullptr;
 
 		cISC4View3DWin* localView3D = pView3D;
 		pView3D = nullptr;
@@ -229,6 +237,9 @@ private:
 			break;
 		case BulldozeNetworkDiagonalShortcutID:
 			ActivateBulldozeTool(cSC4ViewInputControlDemolishHooks::BulldozeCursorNetworkDiagonal);
+			break;
+		case DezoneKeepNetworksShortcutID:
+			ActivateBulldozeTool(cSC4ViewInputControlDemolishHooks::BulldozeCursorDezoneKeepNetworks);
 			break;
 		}
 

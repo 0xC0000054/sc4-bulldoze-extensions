@@ -29,6 +29,12 @@ These 3 modes are activated by Alt keyboard combinations.
 
 The size of the diagonal area can be changed by holding down the _Alt_ key and using the mouse scroll wheel to adjust the size.
 
+### De-Zone Keep Networks Mode
+
+This mode is activated by a _Shift + V_ shortcut. It removes RCI lots and zones, while ignoring the transportation networks.
+The Maxis de-zone tool removes the street and dirt road (RHW) networks.    
+Unlike the Maxis de-zone tool, this tool cannot remove landfill zones.
+
 ## Configuration Options
 
 ### Bulldoze Extensions Tuning Exemplar

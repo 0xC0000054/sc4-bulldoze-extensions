@@ -24,6 +24,7 @@
 #include "cISC4Demolition.h"
 #include "cISC4OccupantFilter.h"
 #include "cRZAutoRefCount.h"
+#include "DezoneKeepNetworksOccupantFilter.h"
 #include "FloraOccupantFilter.h"
 #include "GZServPtrs.h"
 #include "IBulldozeHighlightColors.h"
@@ -105,7 +106,8 @@ namespace
 	{
 		None = 0,
 		Flora = 1,
-		Network = 2
+		Network = 2,
+		DezoneKeepNetworks = 3,
 	};
 
 	enum ModifierKeyFlags : int32_t
@@ -291,6 +293,9 @@ namespace
 					cSC4ViewInputControlDemolishHooks::BulldozeCursorNetworkDiagonal :
 					cSC4ViewInputControlDemolishHooks::BulldozeCursorNetwork);
 				break;
+			case OccupantFilterType::DezoneKeepNetworks:
+				pThis->SetCursor(cSC4ViewInputControlDemolishHooks::BulldozeCursorDezoneKeepNetworks);
+				break;
 			case OccupantFilterType::None:
 			default:
 				pThis->SetCursor(diagonalMode ?
@@ -465,6 +470,18 @@ namespace
 						SetOccupantFilterOption(pThis, OccupantFilterType::None, isDiagonal);
 					}
 				}
+				else if (vkCode == 'V')
+				{
+					// The 'Dezone keep networks' bulldoze mode is activated by Shift + V.
+
+					const uint32_t activeModifiers = modifiers & ModifierKeyFlagAll;
+
+					if ((activeModifiers & ModifierKeyFlagShift) == ModifierKeyFlagShift)
+					{
+						handled = true;
+						SetOccupantFilterOption(pThis, OccupantFilterType::DezoneKeepNetworks, false);
+					}
+				}
 			}
 		}
 
@@ -496,6 +513,9 @@ namespace
 			break;
 		case cSC4ViewInputControlDemolishHooks::BulldozeCursorDefaultDiagonal:
 			diagonalMode = true;
+			break;
+		case cSC4ViewInputControlDemolishHooks::BulldozeCursorDezoneKeepNetworks:
+			occupantFilterType = OccupantFilterType::DezoneKeepNetworks;
 			break;
 		}
 	}
@@ -533,6 +553,10 @@ namespace
 				// Remove only network occupants.
 				occupantFilter = new RemoveNetworksOccupantFilter(NetworkTypeFlags::AllTransportationNetworks);
 			}
+			break;
+		case OccupantFilterType::DezoneKeepNetworks:
+			occupantFilter = new DezoneKeepNetworksOccupantFilter();
+			clearZonedArea = true;
 			break;
 		case OccupantFilterType::None:
 		default:

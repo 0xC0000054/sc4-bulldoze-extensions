@@ -15,29 +15,18 @@
  * GNU Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
- * along with SC4ClearPollution.
+ * along with sc4-bulldoze-extensions.
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
-#include "cISC4ViewInputControl.h"
-#include "cRZAutoRefCount.h"
-#include <cstdint>
+#include "NetworkOccupantFilterBase.h"
 
-namespace cSC4ViewInputControlDemolishHooks
+class DezoneKeepNetworksOccupantFilter : public NetworkOccupantFilterBase
 {
-	enum BulldozeCursor : uint32_t
-	{
-		BulldozeCursorDefault = 0xE1855ADC,
-		BulldozeCursorFlora = 0xED0E06AD,
-		BulldozeCursorNetwork = 0x24ADE8F2,
-		BulldozeCursorDefaultDiagonal = 0xE1855ADD,
-		BulldozeCursorFloraDiagonal = 0xED0E06AE,
-		BulldozeCursorNetworkDiagonal = 0x24ADE8F3,
-		BulldozeCursorDezoneKeepNetworks = 0x16889864,
-	};
+public:
+	DezoneKeepNetworksOccupantFilter();
 
-	cRZAutoRefCount<cISC4ViewInputControl> CreateViewInputControl(BulldozeCursor cursor);
+	bool IsOccupantIncluded(cISC4Occupant* pOccupant) override;
+};
 
-	bool Install();
-}

@@ -78,6 +78,9 @@
     <ClCompile Include="S3DColorFloat.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="DezoneKeepNetworksOccupantFilter.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Logger.h">
@@ -135,6 +138,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="IBulldozeHighlightColors.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="DezoneKeepNetworksOccupantFilter.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GlobalCityPointers.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
