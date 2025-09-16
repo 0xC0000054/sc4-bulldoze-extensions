@@ -72,12 +72,12 @@ inline NetworkTypeFlags& operator&=(NetworkTypeFlags& lhs, NetworkTypeFlags rhs)
 	return reinterpret_cast<NetworkTypeFlags&>(reinterpret_cast<T&>(lhs) &= static_cast<T>(rhs));
 }
 
-class NetworkOccupantFilter : public cSC4BaseOccupantFilter
+class NetworkOccupantFilterBase : public cSC4BaseOccupantFilter
 {
-public:
-	NetworkOccupantFilter(NetworkTypeFlags networkFlags);
+protected:
+	NetworkOccupantFilterBase(NetworkTypeFlags networkFlags);
 
-	bool IsOccupantIncluded(cISC4Occupant* pOccupant) override;
+	bool IsNetworkOccupant(cISC4Occupant* pOccupant) const;
 
 private:
 	uint32_t networkFlags;

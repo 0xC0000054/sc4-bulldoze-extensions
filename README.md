@@ -14,7 +14,10 @@ When the flora bulldoze mode is active, the bulldoze tool will only affect objec
 ### Network Bulldoze Mode
 
 This mode is activated in the city view using a _Shift + B_ shortcut, this can be done with or without the bulldoze tool active.
-When the network bulldoze mode is active, the bulldoze tool will only affect transportation networks (excluding power lines and water pipes).
+The network bulldoze mode has two modes, the modes are selected by the modifier keys that are pressed when releasing the left mouse button after selecting an area.
+
+If the _Shift_ key is pressed, the bulldoze tool will remove everything other than the transportation networks (excluding power lines and water pipes).    
+If the _Shift_ key is not pressed, the bulldoze tool will only remove the transportation networks (excluding power lines and water pipes).
 
 ### Diagonal Bulldoze Modes
 

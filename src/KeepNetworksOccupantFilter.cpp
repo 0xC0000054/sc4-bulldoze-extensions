@@ -19,29 +19,14 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "NetworkOccupantFilter.h"
-#include "cISC4NetworkOccupant.h"
-#include "cISC4Occupant.h"
-#include "cRZAutoRefCount.h"
+#include "KeepNetworksOccupantFilter.h"
 
-NetworkOccupantFilter::NetworkOccupantFilter(NetworkTypeFlags networkTypeFlags)
-	: networkFlags(static_cast<uint32_t>(networkTypeFlags))
+KeepNetworksOccupantFilter::KeepNetworksOccupantFilter(NetworkTypeFlags networkFlags)
+	: NetworkOccupantFilterBase(networkFlags)
 {
 }
 
-bool NetworkOccupantFilter::IsOccupantIncluded(cISC4Occupant* pOccupant)
+bool KeepNetworksOccupantFilter::IsOccupantIncluded(cISC4Occupant* pOccupant)
 {
-	bool result = false;
-
-	if (pOccupant)
-	{
-		cRZAutoRefCount<cISC4NetworkOccupant> networkOccupant;
-
-		if (pOccupant->QueryInterface(GZIID_cISC4NetworkOccupant, networkOccupant.AsPPVoid()))
-		{
-			result = networkOccupant->HasAnyNetworkFlag(networkFlags);
-		}
-	}
-
-	return result;
+	return !IsNetworkOccupant(pOccupant);
 }

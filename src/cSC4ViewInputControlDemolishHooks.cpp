@@ -28,8 +28,9 @@
 #include "GZServPtrs.h"
 #include "IBulldozeHighlightColors.h"
 #include "Logger.h"
-#include "NetworkOccupantFilter.h"
+#include "KeepNetworksOccupantFilter.h"
 #include "Patcher.h"
+#include "RemoveNetworksOccupantFilter.h"
 #include "SC4CellRegion.h"
 #include "SC4List.h"
 #include "SC4VersionDetection.h"
@@ -93,6 +94,13 @@ namespace
 	typedef cSC4ViewInputControlDemolish* (__thiscall* PFN_cSC4ViewInputControlDemolish_ctor)(cSC4ViewInputControlDemolish* pThis);
 	static const PFN_cSC4ViewInputControlDemolish_ctor cSC4ViewInputControlDemolish_ctor = reinterpret_cast<PFN_cSC4ViewInputControlDemolish_ctor>(0x4b9070);
 
+	typedef bool(__thiscall* PFN_cSC4ViewInputControlDemolish_OnMouseUpL)(
+		cSC4ViewInputControlDemolish* pThis,
+		int32_t x,
+		int32_t z,
+		uint32_t modifiers);
+	static const auto RealOnMouseUpL = reinterpret_cast<PFN_cSC4ViewInputControlDemolish_OnMouseUpL>(0x4b9c50);
+
 	enum class OccupantFilterType
 	{
 		None = 0,
@@ -100,12 +108,21 @@ namespace
 		Network = 2
 	};
 
+	enum ModifierKeyFlags : int32_t
+	{
+		ModifierKeyFlagNone = 0,
+		ModifierKeyFlagShift = 0x1,
+		ModifierKeyFlagControl = 0x2,
+		ModifierKeyFlagAlt = 0x4,
+		ModifierKeyFlagAll = ModifierKeyFlagShift | ModifierKeyFlagControl | ModifierKeyFlagAlt,
+	};
+
 	static OccupantFilterType occupantFilterType = OccupantFilterType::None;
 	static bool diagonalMode = false;
 	static int32_t diagonalThickness = 1; // Default thickness is 1 (single line)
 	static constexpr int32_t kMaxDiagonalThickness = 9;
 	static cSC4ViewInputControlDemolish* currentViewControl = nullptr;
-
+	static ModifierKeyFlags keyUpModifiers = ModifierKeyFlagNone;
 
 	// Helper function to create a diagonal region from two points with drag direction detection and thickness
 	SC4CellRegion<int32_t> CreateDiagonalRegion(int32_t x1, int32_t z1, int32_t x2, int32_t z2, int32_t startX = -1, int32_t startZ = -1)
@@ -333,21 +350,24 @@ namespace
 		}
 	}
 
-	enum ModifierKeysFlags : int32_t
+	bool __fastcall OnMouseUpHook(
+		cSC4ViewInputControlDemolish* pThis,
+		void* edxUnused,
+		int32_t x,
+		int32_t z,
+		int32_t modifiers)
 	{
-		ModifierKeyFlagNone = 0,
-		ModifierKeyFlagShift = 0x1,
-		ModifierKeyFlagControl = 0x2,
-		ModifierKeyFlagAlt = 0x4,
-		ModifierKeyFlagAll = ModifierKeyFlagShift | ModifierKeyFlagControl | ModifierKeyFlagAlt,
-	};
+		keyUpModifiers = static_cast<ModifierKeyFlags>(modifiers & ModifierKeyFlagAll);
+
+		return RealOnMouseUpL(pThis, x, z, modifiers);
+	}
 
 	bool __fastcall OnMouseWheelHook(
 		cSC4ViewInputControlDemolish* pThis,
 		void* edxUnused,
 		int32_t x,
 		int32_t z,
-		uint32_t modifiers,
+		int32_t modifiers,
 		int32_t wheelDelta)
 	{
 		// Check if we're in diagonal mode and Alt is held
@@ -499,7 +519,18 @@ namespace
 			occupantFilter = new FloraOccupantFilter();
 			break;
 		case OccupantFilterType::Network:
-			occupantFilter = new NetworkOccupantFilter(NetworkTypeFlags::AllTransportationNetworks);
+			// The network bulldoze mode will change its behavior depending on if the
+			// user was holding down the shift key when they released the left mouse button.
+			if ((keyUpModifiers & ModifierKeyFlagShift) == ModifierKeyFlagShift)
+			{
+				// Keep only network occupants.
+				occupantFilter = new KeepNetworksOccupantFilter(NetworkTypeFlags::AllTransportationNetworks);
+			}
+			else
+			{
+				// Remove only network occupants.
+				occupantFilter = new RemoveNetworksOccupantFilter(NetworkTypeFlags::AllTransportationNetworks);
+			}
 			break;
 		case OccupantFilterType::None:
 		default:
@@ -747,6 +778,7 @@ bool cSC4ViewInputControlDemolishHooks::Install()
 		try
 		{
 			Patcher::InstallJumpTableHook(0xa901d8, reinterpret_cast<uintptr_t>(&OnKeyDownHook));
+			Patcher::InstallJumpTableHook(0xa901e8, reinterpret_cast<uintptr_t>(&OnMouseUpHook));
 			Patcher::InstallJumpTableHook(0xa901f4, reinterpret_cast<uintptr_t>(&OnMouseWheelHook));
 			Patcher::InstallJumpTableHook(0xa901fc, reinterpret_cast<uintptr_t>(&Activate));
 			InstallUpdateSelectedRegionDemolishRegionHook();
