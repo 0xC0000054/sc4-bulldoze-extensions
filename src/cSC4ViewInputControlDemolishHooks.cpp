@@ -117,10 +117,12 @@ namespace
 		ModifierKeyFlagAll = ModifierKeyFlagShift | ModifierKeyFlagControl | ModifierKeyFlagAlt,
 	};
 
+	static constexpr int32_t kDefaultDiagonalThickness = 1; // Single line
+	static constexpr int32_t kMaxDiagonalThickness = 9;
+
 	static OccupantFilterType occupantFilterType = OccupantFilterType::None;
 	static bool diagonalMode = false;
-	static int32_t diagonalThickness = 1; // Default thickness is 1 (single line)
-	static constexpr int32_t kMaxDiagonalThickness = 9;
+	static int32_t diagonalThickness = kDefaultDiagonalThickness;
 	static cSC4ViewInputControlDemolish* currentViewControl = nullptr;
 	static ModifierKeyFlags keyUpModifiers = ModifierKeyFlagNone;
 
@@ -473,7 +475,7 @@ namespace
 	{
 		occupantFilterType = OccupantFilterType::None;
 		diagonalMode = false;
-		diagonalThickness = 1; // Reset thickness to default
+		diagonalThickness = kDefaultDiagonalThickness; // Reset thickness to default
 		currentViewControl = pThis;
 
 		switch (pThis->cursorIID)
